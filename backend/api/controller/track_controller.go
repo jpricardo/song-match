@@ -22,12 +22,12 @@ func (tc *TrackController) FindTrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loginResponse := domain.FindTrackResponse{
+	res := domain.FindTrackResponse{
 		Name: track.Name,
 		Url:  track.Url,
 	}
 
-	err = jsonutil.JsonResponse(w, http.StatusOK, loginResponse)
+	err = jsonutil.JsonResponse(w, http.StatusOK, res)
 	if err != nil {
 		jsonutil.JsonResponse(w, http.StatusInternalServerError, domain.ErrorResponse{Message: err.Error()})
 		return
@@ -43,19 +43,19 @@ func (tc *TrackController) GetMany(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loginResponse := domain.GetTracksResponse{
+	res := domain.GetTracksResponse{
 		Tracks: []domain.FindTrackResponse{},
 	}
 
 	for _, track := range tracks {
-		loginResponse.Tracks = append(loginResponse.Tracks, domain.FindTrackResponse{
+		res.Tracks = append(res.Tracks, domain.FindTrackResponse{
 			Name:    track.Name,
 			Url:     track.Url,
 			Matches: track.Matches,
 		})
 	}
 
-	err = jsonutil.JsonResponse(w, http.StatusOK, loginResponse)
+	err = jsonutil.JsonResponse(w, http.StatusOK, res)
 	if err != nil {
 		jsonutil.JsonResponse(w, http.StatusInternalServerError, domain.ErrorResponse{Message: err.Error()})
 		return
