@@ -6,10 +6,12 @@ import { submitAudio } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { useCompression } from '@/hooks/use-compression';
 import { useRecorder } from '@/hooks/use-recorder';
 import { TrackDTO } from '@/services/track';
 
 export function AudioRecorder() {
+	const compression = useCompression();
 	const recorder = useRecorder();
 	const [matches, setMatches] = useState<TrackDTO[]>();
 	const [error, setError] = useState<Error>();
@@ -21,7 +23,8 @@ export function AudioRecorder() {
 		setMatches(undefined);
 
 		try {
-			const res = await submitAudio(recorder.data!);
+			const compressed = await compression.compress(recorder.data);
+			const res = await submitAudio(compressed);
 			setMatches(res.matches);
 		} catch (err) {
 			setError(err as Error);

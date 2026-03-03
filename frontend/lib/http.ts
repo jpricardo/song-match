@@ -1,15 +1,18 @@
 import { URL } from 'url';
 
+type RequestBody = BodyInit | null | undefined;
 // TODO - Support some common options (params, callbacks, etc)
-type RequestOptions = Partial<{
-	[key: string]: string;
-}>;
+type RequestOptions<TBody extends RequestBody = undefined> = {
+	signal?: AbortSignal;
+	headers?: HeadersInit;
+	body?: TBody;
+};
 
 export interface IHttpAdapter {
 	get<T>(url: string | URL, options?: RequestOptions): Promise<T>;
-	post<T, K = void>(url: string | URL, payload: T, options?: RequestOptions): Promise<K>;
-	put<T, K = void>(url: string | URL, payload: T, options?: RequestOptions): Promise<K>;
-	patch<T, K = void>(url: string | URL, payload: T, options?: RequestOptions): Promise<K>;
+	post<T extends RequestBody, K = void>(url: string | URL, options?: RequestOptions<T>): Promise<K>;
+	put<T extends RequestBody, K = void>(url: string | URL, options?: RequestOptions<T>): Promise<K>;
+	patch<T extends RequestBody, K = void>(url: string | URL, options?: RequestOptions<T>): Promise<K>;
 	delete<T>(url: string | URL, options?: RequestOptions): Promise<T>;
 }
 
@@ -18,22 +21,16 @@ export class HttpAdapter implements IHttpAdapter {
 		return await fetch(url, { method: 'GET', ...options }).then((res) => res.json() as T);
 	}
 
-	public async post<T, K = void>(url: string | URL, payload: T, options?: RequestOptions): Promise<K> {
-		return await fetch(url, { method: 'POST', body: JSON.stringify(payload), ...options }).then(
-			(res) => res.json() as K
-		);
+	public async post<T extends RequestBody, K = void>(url: string | URL, options?: RequestOptions<T>): Promise<K> {
+		return await fetch(url, { method: 'POST', ...options }).then((res) => res.json() as K);
 	}
 
-	public async put<T, K = void>(url: string | URL, payload: T, options?: RequestOptions): Promise<K> {
-		return await fetch(url, { method: 'PUT', body: JSON.stringify(payload), ...options }).then(
-			(res) => res.json() as K
-		);
+	public async put<T extends RequestBody, K = void>(url: string | URL, options?: RequestOptions<T>): Promise<K> {
+		return await fetch(url, { method: 'PUT', ...options }).then((res) => res.json() as K);
 	}
 
-	public async patch<T, K = void>(url: string | URL, payload: T, options?: RequestOptions): Promise<K> {
-		return await fetch(url, { method: 'PATCH', body: JSON.stringify(payload), ...options }).then(
-			(res) => res.json() as K
-		);
+	public async patch<T extends RequestBody, K = void>(url: string | URL, options?: RequestOptions<T>): Promise<K> {
+		return await fetch(url, { method: 'PATCH', ...options }).then((res) => res.json() as K);
 	}
 
 	public async delete<T>(url: string | URL, options?: RequestOptions): Promise<T> {

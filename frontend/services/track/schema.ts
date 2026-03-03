@@ -20,7 +20,7 @@ export type GetTrackDTO = z.output<typeof GetTrackDTOSchema>;
 export const GetTrackResponseSchema = getResponseSchema(GetTrackDTOSchema);
 export type GetTrackResponse = z.output<typeof GetTrackResponseSchema>;
 
-export const PostFindMatchesPayloadSchema = z.object({ content: z.instanceof(Blob) });
+export const PostFindMatchesPayloadSchema = z.instanceof(Uint8Array<ArrayBuffer>);
 export type PostFindMatchesPayload = z.output<typeof PostFindMatchesPayloadSchema>;
 export const PostFindMatchesDTOSchema = z.object({ matches: TrackDTOSchema.array() });
 export type PostFindMatchesDTO = z.output<typeof PostFindMatchesDTOSchema>;

@@ -6,10 +6,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type FindTrackMatchesRequest struct {
-	Content []byte `json:"content"`
-}
-
 type TrackDTO struct {
 	Name    string `json:"name"`
 	Url     string `json:"url"`

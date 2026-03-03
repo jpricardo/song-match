@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"song-match-backend/bootstrap"
@@ -14,9 +16,17 @@ type TrackController struct {
 }
 
 func (tc *TrackController) FindMatches(w http.ResponseWriter, r *http.Request) {
-	var request domain.FindTrackMatchesRequest
 
-	matches, err := tc.TrackUsecase.FindMatches(r.Context(), request.Content)
+	content, err := io.ReadAll(r.Body)
+	if err != nil {
+		jsonutil.JsonErrorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer r.Body.Close()
+
+	fmt.Printf("Received %d bytes\n", len(content))
+
+	matches, err := tc.TrackUsecase.FindMatches(r.Context(), content)
 	if err != nil {
 		jsonutil.JsonErrorResponse(w, http.StatusNotFound, "No matches found for this track")
 		return
