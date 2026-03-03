@@ -23,7 +23,7 @@ func Setup(env *bootstrap.Env, timeout time.Duration, db mongo.Database) http.Ha
 		MaxAge:           300,
 	}))
 
-	mux.Use(middleware.Heartbeat("/ping"))
+	mux.Use(middleware.Heartbeat("/ping"), middleware.DefaultLogger)
 
 	NewTrackRouter(env, timeout, db, mux)
 
