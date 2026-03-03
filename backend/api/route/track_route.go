@@ -20,5 +20,5 @@ func NewTrackRouter(env *bootstrap.Env, timeout time.Duration, db mongo.Database
 	}
 
 	group.Get("/tracks", tc.GetMany)
-	group.Post("/tracks/find", tc.FindTrack)
+	group.Post("/tracks/find", tc.FindMatches)
 }

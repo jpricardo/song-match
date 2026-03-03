@@ -6,22 +6,26 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type FindTrackRequest struct {
+type FindTrackMatchesRequest struct {
 	Content []byte `json:"content"`
 }
 
-type FindTrackResponse struct {
+type TrackDTO struct {
 	Name    string `json:"name"`
 	Url     string `json:"url"`
 	Matches int    `json:"matches"`
 }
 
+type FindTrackMatchesResponse struct {
+	Matches []TrackDTO `json:"matches"`
+}
+
 type GetTracksResponse struct {
-	Tracks []FindTrackResponse `json:"tracks"`
+	Tracks []TrackDTO `json:"tracks"`
 }
 
 type TrackUseCase interface {
-	Match(c context.Context, content []byte) (Track, error)
+	FindMatches(c context.Context, content []byte) ([]Track, error)
 	GetMany(c context.Context) ([]Track, error)
 }
 

@@ -18,14 +18,13 @@ func NewTrackUsecase(trackRepository domain.TrackRepository, timeout time.Durati
 	}
 }
 
-func (tu *trackUsecase) Match(c context.Context, content []byte) (domain.Track, error) {
-	ctx, cancel := context.WithTimeout(c, tu.contextTimeout)
+func (tu *trackUsecase) FindMatches(c context.Context, content []byte) ([]domain.Track, error) {
+	_, cancel := context.WithTimeout(c, tu.contextTimeout)
 	defer cancel()
 
 	// TODO - Track processing / lookup
-	id := ""
-	// TODO - Matches++
-	return tu.trackRepository.GetByID(ctx, id)
+	m := []domain.Track{}
+	return m, nil
 }
 
 func (tu *trackUsecase) GetMany(c context.Context) ([]domain.Track, error) {

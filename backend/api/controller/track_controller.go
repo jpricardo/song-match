@@ -13,23 +13,27 @@ type TrackController struct {
 	Env          *bootstrap.Env
 }
 
-func (tc *TrackController) FindTrack(w http.ResponseWriter, r *http.Request) {
-	var request domain.FindTrackRequest
+func (tc *TrackController) FindMatches(w http.ResponseWriter, r *http.Request) {
+	var request domain.FindTrackMatchesRequest
 
-	track, err := tc.TrackUsecase.Match(r.Context(), request.Content)
+	matches, err := tc.TrackUsecase.FindMatches(r.Context(), request.Content)
 	if err != nil {
-		jsonutil.JsonResponse(w, http.StatusNotFound, domain.ErrorResponse{Message: "No matches found for this track"})
+		jsonutil.JsonErrorResponse(w, http.StatusNotFound, "No matches found for this track")
 		return
 	}
 
-	res := domain.FindTrackResponse{
-		Name: track.Name,
-		Url:  track.Url,
+	rd := domain.FindTrackMatchesResponse{
+		Matches: []domain.TrackDTO{},
 	}
 
-	err = jsonutil.JsonResponse(w, http.StatusOK, res)
+	for _, track := range matches {
+		rd.Matches = append(rd.Matches, domain.TrackDTO{Name: track.Name, Url: track.Url})
+
+	}
+
+	err = jsonutil.JsonSuccessResponse(w, http.StatusOK, rd)
 	if err != nil {
-		jsonutil.JsonResponse(w, http.StatusInternalServerError, domain.ErrorResponse{Message: err.Error()})
+		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 }
@@ -39,25 +43,25 @@ func (tc *TrackController) GetMany(w http.ResponseWriter, r *http.Request) {
 	tracks, err := tc.TrackUsecase.GetMany(r.Context())
 	if err != nil {
 		log.Println(err)
-		jsonutil.JsonResponse(w, http.StatusInternalServerError, domain.ErrorResponse{Message: "Unexpected error"})
+		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, "Unexpected error")
 		return
 	}
 
-	res := domain.GetTracksResponse{
-		Tracks: []domain.FindTrackResponse{},
+	rd := domain.GetTracksResponse{
+		Tracks: []domain.TrackDTO{},
 	}
 
 	for _, track := range tracks {
-		res.Tracks = append(res.Tracks, domain.FindTrackResponse{
+		rd.Tracks = append(rd.Tracks, domain.TrackDTO{
 			Name:    track.Name,
 			Url:     track.Url,
 			Matches: track.Matches,
 		})
 	}
 
-	err = jsonutil.JsonResponse(w, http.StatusOK, res)
+	err = jsonutil.JsonSuccessResponse(w, http.StatusOK, rd)
 	if err != nil {
-		jsonutil.JsonResponse(w, http.StatusInternalServerError, domain.ErrorResponse{Message: err.Error()})
+		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 }

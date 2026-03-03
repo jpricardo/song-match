@@ -3,10 +3,11 @@ package jsonutil
 import (
 	"encoding/json"
 	"net/http"
+	"song-match-backend/domain"
 )
 
-func JsonResponse(w http.ResponseWriter, status int, data interface{}) error {
-	out, err := json.Marshal(data)
+func WriteJson(w http.ResponseWriter, status int, response domain.Response) error {
+	out, err := json.Marshal(response)
 	if err != nil {
 		return err
 	}
@@ -20,4 +21,14 @@ func JsonResponse(w http.ResponseWriter, status int, data interface{}) error {
 	}
 
 	return nil
+}
+
+func JsonSuccessResponse(w http.ResponseWriter, status int, data interface{}) error {
+	r := domain.Response{Success: true, Data: data}
+	return WriteJson(w, status, r)
+}
+
+func JsonErrorResponse(w http.ResponseWriter, status int, message string) error {
+	r := domain.Response{Success: false, Message: message}
+	return WriteJson(w, status, r)
 }
