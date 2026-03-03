@@ -1,14 +1,59 @@
 'use client';
-import { CircleStop, Mic, Play } from 'lucide-react';
+import { Check, CircleStop, Info, Mic } from 'lucide-react';
+import { useState } from 'react';
 
+import { submitAudio } from '@/app/actions';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { useRecorder } from '@/hooks/use-recorder';
+import { TrackDTO } from '@/services/track';
 
 export function AudioRecorder() {
 	const recorder = useRecorder();
+	const [matches, setMatches] = useState<TrackDTO[]>();
+	const [error, setError] = useState<Error>();
+	const [loading, setLoading] = useState(false);
+
+	const handleSubmit = async () => {
+		setLoading(true);
+		setError(undefined);
+		setMatches(undefined);
+
+		try {
+			const res = await submitAudio(recorder.data!);
+			setMatches(res.matches);
+		} catch (err) {
+			setError(err as Error);
+		} finally {
+			setLoading(false);
+		}
+	};
 
 	return (
-		<div className='flex flex-col gap-2 justify-center items-center max-w-md'>
+		<div className='flex flex-col gap-2 justify-center items-center w-full'>
+			{loading && (
+				<Alert className='w-full'>
+					<Spinner />
+					<AlertTitle>Loading...</AlertTitle>
+				</Alert>
+			)}
+
+			{error && (
+				<Alert variant='destructive' className='w-full'>
+					<Info />
+					<AlertTitle>Something went wrong!</AlertTitle>
+					<AlertDescription>{error.message}</AlertDescription>
+				</Alert>
+			)}
+
+			{matches && (
+				<Alert className='w-full'>
+					<Check />
+					<AlertTitle>{matches.length} matches found!</AlertTitle>
+				</Alert>
+			)}
+
 			{recorder.state ? (
 				<div className='flex flex-col gap-4'>
 					<audio className='w-full min-w-xs' src={recorder.url} controls />
@@ -23,8 +68,15 @@ export function AudioRecorder() {
 							</Button>
 						) : (
 							<Button onClick={() => recorder.start()}>
-								<Play />
-								Start
+								<Mic />
+								Start recording
+							</Button>
+						)}
+
+						{recorder.data && (
+							<Button onClick={handleSubmit}>
+								{loading ? <Spinner /> : <Check />}
+								Submit
 							</Button>
 						)}
 					</div>

@@ -11,7 +11,7 @@ export default function Home() {
 					</p>
 				</div>
 
-				<section className='w-full bg-accent rounded-xl px-12 py-6 flex justify-center align-center'>
+				<section className='w-full bg-accent rounded-xl p-6 flex justify-center align-center'>
 					<AudioRecorder />
 				</section>
 			</main>
