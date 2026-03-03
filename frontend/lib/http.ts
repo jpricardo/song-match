@@ -15,22 +15,28 @@ export interface IHttpAdapter {
 
 export class HttpAdapter implements IHttpAdapter {
 	public async get<T>(url: string | URL, options?: RequestOptions): Promise<T> {
-		return await fetch(url, { ...options }).then((res) => res.json() as T);
+		return await fetch(url, { method: 'GET', ...options }).then((res) => res.json() as T);
 	}
 
 	public async post<T, K = void>(url: string | URL, payload: T, options?: RequestOptions): Promise<K> {
-		return await fetch(url, { body: JSON.stringify(payload), ...options }).then((res) => res.json() as K);
+		return await fetch(url, { method: 'POST', body: JSON.stringify(payload), ...options }).then(
+			(res) => res.json() as K
+		);
 	}
 
 	public async put<T, K = void>(url: string | URL, payload: T, options?: RequestOptions): Promise<K> {
-		return await fetch(url, { body: JSON.stringify(payload), ...options }).then((res) => res.json() as K);
+		return await fetch(url, { method: 'PUT', body: JSON.stringify(payload), ...options }).then(
+			(res) => res.json() as K
+		);
 	}
 
 	public async patch<T, K = void>(url: string | URL, payload: T, options?: RequestOptions): Promise<K> {
-		return await fetch(url, { body: JSON.stringify(payload), ...options }).then((res) => res.json() as K);
+		return await fetch(url, { method: 'PATCH', body: JSON.stringify(payload), ...options }).then(
+			(res) => res.json() as K
+		);
 	}
 
 	public async delete<T>(url: string | URL, options?: RequestOptions): Promise<T> {
-		return await fetch(url, { ...options }).then((res) => res.json() as T);
+		return await fetch(url, { method: 'DELETE', ...options }).then((res) => res.json() as T);
 	}
 }
