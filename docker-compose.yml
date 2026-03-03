@@ -1,18 +1,18 @@
 version: '3'
 
 services:
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: ./frontend.dockerfile
-  #   restart: always
-  #   ports:
-  #     - '3000:3000'
-  #   deploy:
-  #     mode: replicated
-  #     replicas: 1
-  #   environment:
-  #     API_URL: http://backend:80/
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ./frontend.dockerfile
+    restart: always
+    ports:
+      - '3000:3000'
+    deploy:
+      mode: replicated
+      replicas: 1
+    environment:
+      API_URL: http://backend:80/
 
   backend:
     build:
