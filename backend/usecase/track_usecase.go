@@ -2,7 +2,9 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"song-match-backend/domain"
+	"song-match-backend/internal/audioutil"
 	"time"
 )
 
@@ -21,6 +23,18 @@ func NewTrackUsecase(trackRepository domain.TrackRepository, timeout time.Durati
 func (tu *trackUsecase) FindMatches(c context.Context, content []byte) ([]domain.Track, error) {
 	_, cancel := context.WithTimeout(c, tu.contextTimeout)
 	defer cancel()
+
+	samples, sampleRate, err := audioutil.DecodeAudio(content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode audio: %w", err)
+	}
+
+	fingerprints, err := audioutil.ExtractFingerprints(samples, sampleRate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract fingerprints: %w", err)
+	}
+
+	fmt.Printf("Extracted %d fingerprints at %d Hz\n", len(fingerprints), sampleRate)
 
 	// TODO - Track processing / lookup
 	m := []domain.Track{}

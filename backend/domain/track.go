@@ -6,6 +6,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+type TrackFingerprint struct {
+	Timestamp float64
+	Peaks     []int
+}
+
 type TrackDTO struct {
 	Name    string `json:"name"`
 	Url     string `json:"url"`

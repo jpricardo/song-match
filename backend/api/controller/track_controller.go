@@ -28,7 +28,7 @@ func (tc *TrackController) FindMatches(w http.ResponseWriter, r *http.Request) {
 
 	matches, err := tc.TrackUsecase.FindMatches(r.Context(), content)
 	if err != nil {
-		jsonutil.JsonErrorResponse(w, http.StatusNotFound, "No matches found for this track")
+		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
