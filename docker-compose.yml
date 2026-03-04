@@ -21,6 +21,9 @@ services:
     restart: always
     ports:
       - '8080:80'
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     deploy:
       mode: replicated
       replicas: 1

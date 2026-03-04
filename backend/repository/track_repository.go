@@ -22,10 +22,10 @@ func NewTrackRepository(db mongo.Database, collection string) domain.TrackReposi
 	}
 }
 
-func (tr *trackRepository) Create(c context.Context, user *domain.Track) error {
+func (tr *trackRepository) Create(c context.Context, track *domain.Track) error {
 	collection := tr.database.Collection(tr.collection)
 
-	_, err := collection.InsertOne(c, user)
+	_, err := collection.InsertOne(c, track)
 
 	return err
 }

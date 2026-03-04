@@ -4,16 +4,21 @@ import {
 	GetTrackResponseSchema,
 	GetTracksDTO,
 	GetTracksResponseSchema,
+	PostAddTrackPayload,
+	PostAddTrackPayloadSchema,
+	PostAddTrackResponseSchema,
 	PostFindMatchesDTO,
 	PostFindMatchesPayload,
 	PostFindMatchesPayloadSchema,
 	PostFindMatchesResponseSchema,
+	TrackDTO,
 } from './schema';
 
 export interface ITrackService {
 	getMany(): Promise<GetTracksDTO>;
 	getOne(id: string): Promise<GetTrackDTO>;
 	findMatches(payload: PostFindMatchesPayload): Promise<PostFindMatchesDTO>;
+	addTrack(payload: PostAddTrackPayload): Promise<TrackDTO>;
 }
 
 export class TrackService implements ITrackService {
@@ -34,6 +39,13 @@ export class TrackService implements ITrackService {
 	public async findMatches(payload: PostFindMatchesPayload): Promise<PostFindMatchesDTO> {
 		const p = PostFindMatchesPayloadSchema.encode(payload);
 		const res = await this.trackApi.postFindMatches(p).then((d) => PostFindMatchesResponseSchema.decode(d));
+		if (!res.success) throw new Error(res.message);
+		return res.data;
+	}
+
+	public async addTrack(payload: PostAddTrackPayload): Promise<TrackDTO> {
+		const p = PostAddTrackPayloadSchema.encode(payload);
+		const res = await this.trackApi.postAddTrack(p).then((d) => PostAddTrackResponseSchema.decode(d));
 		if (!res.success) throw new Error(res.message);
 		return res.data;
 	}

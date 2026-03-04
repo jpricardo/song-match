@@ -10,6 +10,7 @@ RUN chmod +x /app/backend
 
 FROM alpine:latest
 
+RUN apk add --no-cache ffmpeg yt-dlp
 RUN mkdir /app
 
 COPY --from=builder /app/backend /app

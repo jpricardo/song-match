@@ -11,10 +11,18 @@ type TrackFingerprint struct {
 	Peaks     []int
 }
 
+type FingerprintDTO struct {
+	Timestamp float64 `json:"timestamp"`
+	Peaks     []int   `json:"peaks"`
+}
+
 type TrackDTO struct {
-	Name    string `json:"name"`
-	Url     string `json:"url"`
-	Matches int    `json:"matches"`
+	ID           primitive.ObjectID `json:"id"`
+	Name         string             `json:"name"`
+	Url          string             `json:"url"`
+	Thumbnail    string             `json:"thumbnail,omitempty"`
+	Matches      int                `json:"matches"`
+	Fingerprints []FingerprintDTO   `json:"fingerprints"`
 }
 
 type FindTrackMatchesResponse struct {
@@ -25,9 +33,16 @@ type GetTracksResponse struct {
 	Tracks []TrackDTO `json:"tracks"`
 }
 
+type AddTrackPayload struct {
+	Url string `json:"url"`
+}
+
+type AddTrackResponse TrackDTO
+
 type TrackUseCase interface {
 	FindMatches(c context.Context, content []byte) ([]Track, error)
 	GetMany(c context.Context) ([]Track, error)
+	AddTrack(c context.Context, url string) (*Track, error)
 }
 
 const (
@@ -35,10 +50,12 @@ const (
 )
 
 type Track struct {
-	ID      primitive.ObjectID `bson:"_id"`
-	Name    string             `bson:"name"`
-	Url     string             `bson:"url"`
-	Matches int                `bson:"matches"`
+	ID           primitive.ObjectID `bson:"_id,omitempty"`
+	Name         string             `bson:"name"`
+	Url          string             `bson:"url"`
+	Thumbnail    string             `bson:"thumbnail,omitempty"`
+	Matches      int                `bson:"matches"`
+	Fingerprints []TrackFingerprint `bson:"fingerprints"`
 }
 
 type TrackRepository interface {

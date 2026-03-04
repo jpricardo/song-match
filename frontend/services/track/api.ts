@@ -2,12 +2,19 @@ import z from 'zod';
 
 import { IHttpAdapter } from '@/lib/http';
 
-import { GetTrackResponseSchema, GetTracksResponseSchema, PostFindMatchesResponseSchema } from './schema';
+import {
+	GetTrackResponseSchema,
+	GetTracksResponseSchema,
+	PostAddTrackPayloadSchema,
+	PostAddTrackResponseSchema,
+	PostFindMatchesResponseSchema,
+} from './schema';
 
 export interface ITrackApi {
 	getMany(): Promise<z.input<typeof GetTracksResponseSchema>>;
 	getOne(id: string): Promise<z.input<typeof GetTrackResponseSchema>>;
 	postFindMatches(payload: Uint8Array<ArrayBuffer>): Promise<z.input<typeof PostFindMatchesResponseSchema>>;
+	postAddTrack(payload: z.input<typeof PostAddTrackPayloadSchema>): Promise<z.input<typeof PostAddTrackResponseSchema>>;
 }
 
 export class TrackApi implements ITrackApi {
@@ -18,15 +25,24 @@ export class TrackApi implements ITrackApi {
 	}
 
 	public async getOne(id: string): Promise<z.input<typeof GetTrackResponseSchema>> {
-		return this.httpAdapter.get(`${this.baseUrl}/tracks/${id}`);
+		return await this.httpAdapter.get(`${this.baseUrl}/tracks/${id}`);
 	}
 
 	public async postFindMatches(
 		payload: Uint8Array<ArrayBuffer>
 	): Promise<z.input<typeof PostFindMatchesResponseSchema>> {
-		return this.httpAdapter.post(`${this.baseUrl}/tracks/find`, {
+		return await this.httpAdapter.post(`${this.baseUrl}/tracks/find`, {
 			body: payload,
 			headers: { 'Content-Type': 'application/octet-stream' },
+		});
+	}
+
+	public async postAddTrack(
+		payload: z.input<typeof PostAddTrackPayloadSchema>
+	): Promise<z.input<typeof PostAddTrackResponseSchema>> {
+		return await this.httpAdapter.post(`${this.baseUrl}/tracks`, {
+			body: JSON.stringify(payload),
+			headers: { 'Content-Type': 'application/json' },
 		});
 	}
 }
