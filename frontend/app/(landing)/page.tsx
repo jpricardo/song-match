@@ -1,4 +1,4 @@
-import { AudioRecorder } from './_components/audio-recorder';
+import AudioRecorder from './_components/audio-recorder';
 
 export default function Home() {
 	return (
