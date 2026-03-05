@@ -10,27 +10,32 @@ import {
 	PostFindMatchesResponseSchema,
 } from './schema';
 
+type ApiResponse<T> = Promise<{ success: true; data: T } | { success: false; message: string }>;
+
 export interface ITrackApi {
-	getMany(): Promise<z.input<typeof GetTracksResponseSchema>>;
-	getOne(id: string): Promise<z.input<typeof GetTrackResponseSchema>>;
-	postFindMatches(payload: Uint8Array<ArrayBuffer>): Promise<z.input<typeof PostFindMatchesResponseSchema>>;
-	postAddTrack(payload: z.input<typeof PostAddTrackPayloadSchema>): Promise<z.input<typeof PostAddTrackResponseSchema>>;
+	getMany(): ApiResponse<z.input<typeof GetTracksResponseSchema>>;
+	getOne(id: string): ApiResponse<z.input<typeof GetTrackResponseSchema>>;
+	postFindMatches(payload: Uint8Array<ArrayBuffer>): ApiResponse<z.input<typeof PostFindMatchesResponseSchema>>;
+	postAddTrack(
+		payload: z.input<typeof PostAddTrackPayloadSchema>
+	): ApiResponse<z.input<typeof PostAddTrackResponseSchema>>;
+	delete(id: string): ApiResponse<void>;
 }
 
 export class TrackApi implements ITrackApi {
 	constructor(private readonly baseUrl: string, private readonly httpAdapter: IHttpAdapter) {}
 
-	public async getMany(): Promise<z.input<typeof GetTracksResponseSchema>> {
+	public async getMany(): ApiResponse<z.input<typeof GetTracksResponseSchema>> {
 		return await this.httpAdapter.get(`${this.baseUrl}/tracks`);
 	}
 
-	public async getOne(id: string): Promise<z.input<typeof GetTrackResponseSchema>> {
+	public async getOne(id: string): ApiResponse<z.input<typeof GetTrackResponseSchema>> {
 		return await this.httpAdapter.get(`${this.baseUrl}/tracks/${id}`);
 	}
 
 	public async postFindMatches(
 		payload: Uint8Array<ArrayBuffer>
-	): Promise<z.input<typeof PostFindMatchesResponseSchema>> {
+	): ApiResponse<z.input<typeof PostFindMatchesResponseSchema>> {
 		return await this.httpAdapter.post(`${this.baseUrl}/tracks/find`, {
 			body: payload,
 			headers: { 'Content-Type': 'application/octet-stream' },
@@ -39,10 +44,14 @@ export class TrackApi implements ITrackApi {
 
 	public async postAddTrack(
 		payload: z.input<typeof PostAddTrackPayloadSchema>
-	): Promise<z.input<typeof PostAddTrackResponseSchema>> {
+	): ApiResponse<z.input<typeof PostAddTrackResponseSchema>> {
 		return await this.httpAdapter.post(`${this.baseUrl}/tracks`, {
 			body: JSON.stringify(payload),
 			headers: { 'Content-Type': 'application/json' },
 		});
+	}
+
+	public async delete(id: string): ApiResponse<void> {
+		return await this.httpAdapter.delete(`${this.baseUrl}/tracks/${id}`);
 	}
 }

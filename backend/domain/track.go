@@ -15,7 +15,7 @@ type TrackDTO struct {
 	ID           primitive.ObjectID `json:"id"`
 	Name         string             `json:"name"`
 	Url          string             `json:"url"`
-	Thumbnail    string             `json:"thumbnail,omitempty"`
+	Thumbnail    string             `json:"thumbnail"`
 	Matches      int                `json:"matches"`
 	Fingerprints []FingerprintDTO   `json:"fingerprints"`
 }
@@ -58,7 +58,7 @@ type Track struct {
 	ID           primitive.ObjectID `bson:"_id,omitempty"`
 	Name         string             `bson:"name"`
 	Url          string             `bson:"url"`
-	Thumbnail    string             `bson:"thumbnail,omitempty"`
+	Thumbnail    string             `bson:"thumbnail"`
 	Matches      int                `bson:"matches"`
 	Fingerprints []TrackFingerprint `bson:"-"`
 }

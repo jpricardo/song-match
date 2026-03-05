@@ -17,3 +17,13 @@ export async function addTrack(fd: FormData) {
 	refresh();
 	redirect('/tracks');
 }
+
+export async function deleteTrack(fd: FormData) {
+	const id = fd.get('id');
+	if (typeof id !== 'string') throw new Error('Invalid ID!');
+
+	await trackService.delete(id);
+
+	refresh();
+	redirect('/tracks');
+}
