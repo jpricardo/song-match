@@ -23,36 +23,66 @@ type peakData struct {
 	magnitude float64
 }
 
-func FindPeaks(spectrum []float64) []int {
-	var localPeaks []peakData
+// Define our frequency bands in Hz
+var frequencyBands = [5][2]float64{
+	{40, 250},     // Bass (Kick drums, Bassline)
+	{250, 500},    // Low-Mids (Cello, Low guitars, Deep vocals)
+	{500, 2000},   // Mids (Vocals, Lead guitars, Synths)
+	{2000, 4000},  // High-Mids (Snare attack, Cymbals)
+	{4000, 16000}, // Treble (Air, Hi-hats)
+}
 
-	// 1. Find all local maxima (including the microscopic noise)
-	for i := 1; i < len(spectrum)-1; i++ {
-		if spectrum[i] > spectrum[i-1] && spectrum[i] > spectrum[i+1] {
-			if spectrum[i] > 0.01 {
-				localPeaks = append(localPeaks, peakData{
-					bin:       i,
-					magnitude: spectrum[i],
-				})
+// Update FindPeaks to accept sampleRate to calculate Hz correctly
+func FindPeaks(spectrum []float64, sampleRate int) []int {
+	peaks := []int{}
+
+	// The full FFT size is twice the spectrum length
+	fftSize := len(spectrum) * 2
+	hzPerBin := float64(sampleRate) / float64(fftSize)
+
+	// Iterate through each of the 5 frequency bands
+	for _, band := range frequencyBands {
+		var localPeaks []peakData
+
+		// Convert the Hz targets into FFT bin indices
+		minBin := int(band[0] / hzPerBin)
+		maxBin := int(band[1] / hzPerBin)
+
+		// Ensure we don't go out of bounds of our array
+		if minBin < 1 {
+			minBin = 1
+		}
+		if maxBin > len(spectrum)-2 {
+			maxBin = len(spectrum) - 2
+		}
+
+		// 1. Find all local maxima within THIS specific band
+		for i := minBin; i <= maxBin; i++ {
+			if spectrum[i] > spectrum[i-1] && spectrum[i] > spectrum[i+1] {
+				// Noise gate: Ignore total silence
+				if spectrum[i] > 0.05 {
+					localPeaks = append(localPeaks, peakData{
+						bin:       i,
+						magnitude: spectrum[i],
+					})
+				}
 			}
 		}
-	}
 
-	// 2. Sort the peaks descending by their magnitude (loudest first)
-	sort.Slice(localPeaks, func(i, j int) bool {
-		return localPeaks[i].magnitude > localPeaks[j].magnitude
-	})
+		// 2. Sort the peaks in THIS band descending by magnitude
+		sort.Slice(localPeaks, func(i, j int) bool {
+			return localPeaks[i].magnitude > localPeaks[j].magnitude
+		})
 
-	// 3. Keep only the Top 10 strongest peaks
-	maxPeaks := 10
-	if len(localPeaks) < maxPeaks {
-		maxPeaks = len(localPeaks)
-	}
+		// 3. Keep only the Top 2 loudest peaks from this band
+		maxPeaksForBand := 2
+		if len(localPeaks) < maxPeaksForBand {
+			maxPeaksForBand = len(localPeaks)
+		}
 
-	// 4. Extract just the bin numbers for our JSON output
-	peaks := []int{}
-	for i := 0; i < maxPeaks; i++ {
-		peaks = append(peaks, localPeaks[i].bin)
+		for i := 0; i < maxPeaksForBand; i++ {
+			peaks = append(peaks, localPeaks[i].bin)
+		}
 	}
 
 	return peaks
@@ -74,7 +104,7 @@ func ExtractFingerprints(samples []float64, sampleRate int) ([]domain.TrackFinge
 
 		fingerprint := domain.TrackFingerprint{
 			Timestamp: float64(i) / float64(sampleRate),
-			Peaks:     FindPeaks(spectrum),
+			Peaks:     FindPeaks(spectrum, sampleRate),
 		}
 
 		fingerprints = append(fingerprints, fingerprint)
@@ -102,7 +132,6 @@ func DecodeAudio(data []byte) ([]float64, int, error) {
 
 	n := len(buf.Data)
 
-	// Convert to float64 and mix channels if stereo
 	samples := make([]float64, n)
 	for i := 0; i < n; i++ {
 		samples[i] = float64(buf.Data[i]) / 32768.0
@@ -112,7 +141,6 @@ func DecodeAudio(data []byte) ([]float64, int, error) {
 }
 
 func computeFFT(signal []float64) []float64 {
-	// Pad to next power of 2 for FFT efficiency
 	fftSize := 1
 	for fftSize < len(signal) {
 		fftSize *= 2
@@ -125,7 +153,6 @@ func computeFFT(signal []float64) []float64 {
 
 	result := fft.FFT(padded)
 
-	// Get magnitude spectrum
 	spectrum := make([]float64, len(result)/2)
 	for i := range spectrum {
 		spectrum[i] = math.Abs(real(result[i]))
