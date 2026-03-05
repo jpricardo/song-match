@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"song-match-backend/domain"
+	"sort"
 
 	"github.com/go-audio/wav"
 	"github.com/madelynnblue/go-dsp/fft"
@@ -17,14 +18,43 @@ func HannWindow(signal []float64) {
 	}
 }
 
-func FindPeaks(spectrum []float64) []int {
-	peaks := []int{}
+type peakData struct {
+	bin       int
+	magnitude float64
+}
 
+func FindPeaks(spectrum []float64) []int {
+	var localPeaks []peakData
+
+	// 1. Find all local maxima (including the microscopic noise)
 	for i := 1; i < len(spectrum)-1; i++ {
 		if spectrum[i] > spectrum[i-1] && spectrum[i] > spectrum[i+1] {
-			peaks = append(peaks, i)
+			if spectrum[i] > 0.01 {
+				localPeaks = append(localPeaks, peakData{
+					bin:       i,
+					magnitude: spectrum[i],
+				})
+			}
 		}
 	}
+
+	// 2. Sort the peaks descending by their magnitude (loudest first)
+	sort.Slice(localPeaks, func(i, j int) bool {
+		return localPeaks[i].magnitude > localPeaks[j].magnitude
+	})
+
+	// 3. Keep only the Top 10 strongest peaks
+	maxPeaks := 10
+	if len(localPeaks) < maxPeaks {
+		maxPeaks = len(localPeaks)
+	}
+
+	// 4. Extract just the bin numbers for our JSON output
+	peaks := []int{}
+	for i := 0; i < maxPeaks; i++ {
+		peaks = append(peaks, localPeaks[i].bin)
+	}
+
 	return peaks
 }
 
