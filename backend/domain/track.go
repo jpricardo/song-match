@@ -42,6 +42,8 @@ type AddTrackResponse TrackDTO
 type TrackUseCase interface {
 	FindMatches(c context.Context, content []byte) ([]Track, error)
 	GetMany(c context.Context) ([]Track, error)
+	GetByID(c context.Context, id string) (Track, error)
+	DeleteByID(c context.Context, id string) error
 	AddTrack(c context.Context, url string) (*Track, error)
 }
 
@@ -61,5 +63,6 @@ type Track struct {
 type TrackRepository interface {
 	Create(c context.Context, track *Track) error
 	Fetch(c context.Context) ([]Track, error)
+	DeleteByID(c context.Context, id string) error
 	GetByID(c context.Context, id string) (Track, error)
 }

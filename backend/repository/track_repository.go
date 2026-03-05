@@ -63,3 +63,15 @@ func (tr *trackRepository) GetByID(c context.Context, id string) (domain.Track, 
 	err = collection.FindOne(c, bson.M{"_id": idHex}).Decode(&track)
 	return track, err
 }
+
+func (tr *trackRepository) DeleteByID(c context.Context, id string) error {
+	collection := tr.database.Collection(tr.collection)
+
+	idHex, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	_, err = collection.DeleteOne(c, bson.M{"_id": idHex})
+	return nil
+}

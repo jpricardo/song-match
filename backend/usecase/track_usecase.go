@@ -49,6 +49,13 @@ func (tu *trackUsecase) GetMany(c context.Context) ([]domain.Track, error) {
 	return tu.trackRepository.Fetch(ctx)
 }
 
+func (tu *trackUsecase) GetByID(c context.Context, id string) (domain.Track, error) {
+	ctx, cancel := context.WithTimeout(c, tu.contextTimeout)
+	defer cancel()
+
+	return tu.trackRepository.GetByID(ctx, id)
+}
+
 func (tu *trackUsecase) AddTrack(c context.Context, url string) (*domain.Track, error) {
 	ctx, cancel := context.WithTimeout(c, tu.contextTimeout)
 	defer cancel()
@@ -80,4 +87,11 @@ func (tu *trackUsecase) AddTrack(c context.Context, url string) (*domain.Track, 
 	tu.trackRepository.Create(ctx, t)
 
 	return t, nil
+}
+
+func (tu *trackUsecase) DeleteByID(c context.Context, id string) error {
+	ctx, cancel := context.WithTimeout(c, tu.contextTimeout)
+	defer cancel()
+
+	return tu.trackRepository.DeleteByID(ctx, id)
 }

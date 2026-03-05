@@ -8,6 +8,8 @@ import (
 	"song-match-backend/bootstrap"
 	"song-match-backend/domain"
 	"song-match-backend/internal/jsonutil"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type TrackController struct {
@@ -97,6 +99,29 @@ func (tc *TrackController) GetMany(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (tc *TrackController) GetById(w http.ResponseWriter, r *http.Request) {
+	trackId := chi.URLParam(r, "trackId")
+
+	track, err := tc.TrackUsecase.GetByID(r.Context(), trackId)
+	if err != nil {
+		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, "Unexpected error")
+		return
+	}
+
+	fp := []domain.FingerprintDTO{}
+	rd := domain.TrackDTO{ID: track.ID, Name: track.Name, Url: track.Url, Thumbnail: track.Thumbnail, Matches: track.Matches, Fingerprints: fp}
+
+	for _, fingerprint := range track.Fingerprints {
+		fp = append(fp, domain.FingerprintDTO{Timestamp: fingerprint.Timestamp, Peaks: fingerprint.Peaks})
+	}
+
+	err = jsonutil.JsonSuccessResponse(w, http.StatusOK, rd)
+	if err != nil {
+		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+}
+
 func (tc *TrackController) AddTrack(w http.ResponseWriter, r *http.Request) {
 	var payload domain.AddTrackPayload
 
@@ -130,6 +155,23 @@ func (tc *TrackController) AddTrack(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = jsonutil.JsonSuccessResponse(w, http.StatusOK, rd)
+	if err != nil {
+		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+}
+
+func (tc *TrackController) DeleteById(w http.ResponseWriter, r *http.Request) {
+	trackId := chi.URLParam(r, "trackId")
+
+	err := tc.TrackUsecase.DeleteByID(r.Context(), trackId)
+	if err != nil {
+		log.Println(err)
+		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, "Unexpected error")
+		return
+	}
+
+	err = jsonutil.JsonSuccessResponse(w, http.StatusOK, "")
 	if err != nil {
 		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
