@@ -1,4 +1,2 @@
-- Scraping
-- Fingerprinting
-- Upload
+- Song matching
 - UI
