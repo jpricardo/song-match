@@ -109,10 +109,17 @@ func (tc *TrackController) GetById(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fp := []domain.FingerprintDTO{}
-	rd := domain.TrackDTO{ID: track.ID, Name: track.Name, Url: track.Url, Thumbnail: track.Thumbnail, Matches: track.Matches, Fingerprints: fp}
-
 	for _, fingerprint := range track.Fingerprints {
 		fp = append(fp, domain.FingerprintDTO{Timestamp: fingerprint.Timestamp, Peaks: fingerprint.Peaks})
+	}
+
+	rd := domain.TrackDTO{
+		ID:           track.ID,
+		Name:         track.Name,
+		Url:          track.Url,
+		Thumbnail:    track.Thumbnail,
+		Matches:      track.Matches,
+		Fingerprints: fp,
 	}
 
 	err = jsonutil.JsonSuccessResponse(w, http.StatusOK, rd)

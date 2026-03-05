@@ -6,7 +6,6 @@ import (
 	"math"
 	"song-match-backend/domain"
 
-	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	"github.com/madelynnblue/go-dsp/fft"
 )
@@ -19,7 +18,8 @@ func HannWindow(signal []float64) {
 }
 
 func FindPeaks(spectrum []float64) []int {
-	var peaks []int
+	peaks := []int{}
+
 	for i := 1; i < len(spectrum)-1; i++ {
 		if spectrum[i] > spectrum[i-1] && spectrum[i] > spectrum[i+1] {
 			peaks = append(peaks, i)
@@ -29,14 +29,16 @@ func FindPeaks(spectrum []float64) []int {
 }
 
 func ExtractFingerprints(samples []float64, sampleRate int) ([]domain.TrackFingerprint, error) {
-	windowSize := 2048
-	hopSize := 512 // advance by 512 samples per window (~1 per second at 44.1kHz)
+	windowSize := 8192
+	hopSize := 4096
 
 	var fingerprints []domain.TrackFingerprint
 
 	// Slide window over audio
 	for i := 0; i+windowSize < len(samples); i += hopSize {
-		window := samples[i : i+windowSize]
+		window := make([]float64, windowSize)
+		copy(window, samples[i:i+windowSize])
+
 		HannWindow(window)
 		spectrum := computeFFT(window)
 
@@ -63,11 +65,12 @@ func DecodeAudio(data []byte) ([]float64, int, error) {
 		return nil, 0, fmt.Errorf("invalid WAV file")
 	}
 
-	buf := &audio.IntBuffer{Format: decoder.Format()}
-	n, err := decoder.PCMBuffer(buf)
+	buf, err := decoder.FullPCMBuffer()
 	if err != nil {
 		return nil, 0, err
 	}
+
+	n := len(buf.Data)
 
 	// Convert to float64 and mix channels if stereo
 	samples := make([]float64, n)

@@ -29,7 +29,7 @@ services:
       replicas: 1
     environment:
       SERVER_ADDRESS: :80
-      CONTEXT_TIMEOUT: 10
+      CONTEXT_TIMEOUT: 120
       DB_HOST: mongo
       DB_PORT: 27017
       DB_USER: admin

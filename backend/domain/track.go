@@ -6,11 +6,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type TrackFingerprint struct {
-	Timestamp float64
-	Peaks     []int
-}
-
 type FingerprintDTO struct {
 	Timestamp float64 `json:"timestamp"`
 	Peaks     []int   `json:"peaks"`
@@ -48,8 +43,16 @@ type TrackUseCase interface {
 }
 
 const (
-	CollectionTrack = "tracks"
+	CollectionTrack       = "tracks"
+	CollectionFingerprint = "fingerprints"
 )
+
+type TrackFingerprint struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty"`
+	TrackID   primitive.ObjectID `bson:"track_id"`
+	Timestamp float64            `bson:"timestamp"`
+	Peaks     []int              `bson:"peaks"`
+}
 
 type Track struct {
 	ID           primitive.ObjectID `bson:"_id,omitempty"`
@@ -57,7 +60,7 @@ type Track struct {
 	Url          string             `bson:"url"`
 	Thumbnail    string             `bson:"thumbnail,omitempty"`
 	Matches      int                `bson:"matches"`
-	Fingerprints []TrackFingerprint `bson:"fingerprints"`
+	Fingerprints []TrackFingerprint `bson:"-"`
 }
 
 type TrackRepository interface {

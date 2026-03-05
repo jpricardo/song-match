@@ -84,7 +84,10 @@ func (tu *trackUsecase) AddTrack(c context.Context, url string) (*domain.Track, 
 		Matches:      0,
 		Fingerprints: fingerprints,
 	}
-	tu.trackRepository.Create(ctx, t)
+	err = tu.trackRepository.Create(ctx, t)
+	if err != nil {
+		return nil, err
+	}
 
 	return t, nil
 }

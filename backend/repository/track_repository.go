@@ -25,9 +25,33 @@ func NewTrackRepository(db mongo.Database, collection string) domain.TrackReposi
 func (tr *trackRepository) Create(c context.Context, track *domain.Track) error {
 	collection := tr.database.Collection(tr.collection)
 
-	_, err := collection.InsertOne(c, track)
+	// Insert the Track
+	id, err := collection.InsertOne(c, track)
+	if err != nil {
+		return err
+	}
 
-	return err
+	if oid, ok := id.(primitive.ObjectID); ok {
+		track.ID = oid
+	}
+
+	// Bulk Insert the Fingerprints into their own collection
+	if len(track.Fingerprints) > 0 {
+		fpColl := tr.database.Collection(domain.CollectionFingerprint)
+
+		var docs []interface{}
+		for i := range track.Fingerprints {
+			track.Fingerprints[i].TrackID = track.ID
+			docs = append(docs, track.Fingerprints[i])
+		}
+
+		_, err = fpColl.InsertMany(c, docs)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (tr *trackRepository) Fetch(c context.Context) ([]domain.Track, error) {
@@ -35,24 +59,21 @@ func (tr *trackRepository) Fetch(c context.Context) ([]domain.Track, error) {
 
 	opts := options.Find()
 	cursor, err := collection.Find(c, bson.D{}, opts)
-
 	if err != nil {
 		return nil, err
 	}
 
 	var tracks []domain.Track
-
 	err = cursor.All(c, &tracks)
-	if tracks == nil {
+	if err != nil || tracks == nil {
 		return []domain.Track{}, err
 	}
 
-	return tracks, err
+	return tracks, nil
 }
 
 func (tr *trackRepository) GetByID(c context.Context, id string) (domain.Track, error) {
 	collection := tr.database.Collection(tr.collection)
-
 	var track domain.Track
 
 	idHex, err := primitive.ObjectIDFromHex(id)
@@ -60,8 +81,23 @@ func (tr *trackRepository) GetByID(c context.Context, id string) (domain.Track, 
 		return track, err
 	}
 
+	// Fetch the Track
 	err = collection.FindOne(c, bson.M{"_id": idHex}).Decode(&track)
-	return track, err
+	if err != nil {
+		return track, err
+	}
+
+	// Fetch its Fingerprints
+	fpColl := tr.database.Collection(domain.CollectionFingerprint)
+	cursor, err := fpColl.Find(c, bson.M{"track_id": idHex})
+	if err == nil {
+		var fps []domain.TrackFingerprint
+		if err = cursor.All(c, &fps); err == nil {
+			track.Fingerprints = fps
+		}
+	}
+
+	return track, nil
 }
 
 func (tr *trackRepository) DeleteByID(c context.Context, id string) error {
