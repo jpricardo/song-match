@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 
 import AddTrackDialog from './_components/add-track-dialog';
-import TrackList from './_components/track-list';
+import TrackList, { TrackListSkeleton } from './_components/track-list';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +14,7 @@ export default function Tracks() {
 				<AddTrackDialog />
 			</div>
 
-			<Suspense fallback={<>Loading...</>}>
+			<Suspense fallback={<TrackListSkeleton />}>
 				<TrackList />
 			</Suspense>
 		</div>

@@ -10,8 +10,9 @@ export const TrackDTOSchema = z.object({
 	id: z.string(),
 	name: z.string(),
 	url: z.url(),
-	thumbnail: z.url(),
+	thumbnail: z.url().optional(),
 	fingerprints: FingerprintDTOSchema.array(),
+	status: z.enum(['', 'failed', 'processing', 'ready']).transform((v) => v || 'ready'),
 });
 export type TrackDTO = z.output<typeof TrackDTOSchema>;
 

@@ -185,3 +185,63 @@ func (tr *trackRepository) GetMatchingHashes(c context.Context, hashValues []str
 
 	return hashes, nil
 }
+
+func (tr *trackRepository) UpdateTrackData(c context.Context, track *domain.Track) error {
+	collection := tr.database.Collection(tr.collection)
+
+	// Update the track document itself (name, thumbnail, status)
+	update := bson.M{
+		"$set": bson.M{
+			"name":      track.Name,
+			"thumbnail": track.Thumbnail,
+			"status":    track.Status,
+		},
+	}
+	_, err := collection.UpdateOne(c, bson.M{"_id": track.ID}, update)
+	if err != nil {
+		return err
+	}
+
+	// Bulk Insert the Fingerprints
+	if len(track.Fingerprints) > 0 {
+		fpColl := tr.database.Collection(domain.CollectionFingerprint)
+		var docs []interface{}
+		for i := range track.Fingerprints {
+			track.Fingerprints[i].TrackID = track.ID
+			docs = append(docs, track.Fingerprints[i])
+		}
+		_, err = fpColl.InsertMany(c, docs)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Bulk Insert the Hashes
+	if len(track.Hashes) > 0 {
+		hashColl := tr.database.Collection(domain.CollectionHashes)
+		var docs []interface{}
+		for i := range track.Hashes {
+			track.Hashes[i].TrackID = track.ID
+			docs = append(docs, track.Hashes[i])
+		}
+		_, err = hashColl.InsertMany(c, docs)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (tr *trackRepository) UpdateTrackStatus(c context.Context, id string, status string) error {
+	collection := tr.database.Collection(tr.collection)
+
+	idHex, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	update := bson.M{"$set": bson.M{"status": status}}
+	_, err = collection.UpdateOne(c, bson.M{"_id": idHex}, update)
+	return err
+}

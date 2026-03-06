@@ -1,9 +1,21 @@
-import { ChevronRightIcon } from 'lucide-react';
-import Image from 'next/image';
-import Link from 'next/link';
-
-import { Item, ItemActions, ItemContent, ItemHeader, ItemTitle } from '@/components/ui/item';
 import { trackService } from '@/services/track';
+
+import Track, { TrackSkeleton } from './track';
+
+export function TrackListSkeleton() {
+	const amt = 24;
+	const items = Array.from({ length: amt });
+
+	return (
+		<div className='flex flex-row gap-4 flex-wrap'>
+			{items.map((_, i) => (
+				<div key={i} className='min-w-xs sm:w-full md:w-xs'>
+					<TrackSkeleton key={i} />
+				</div>
+			))}
+		</div>
+	);
+}
 
 export default async function TrackList() {
 	const { tracks } = await trackService.getMany();
@@ -14,19 +26,9 @@ export default async function TrackList() {
 
 			<div className='flex flex-row gap-4 flex-wrap'>
 				{tracks.map((t) => (
-					<Item key={t.id} variant='outline' asChild className='max-w-xs w-full'>
-						<Link href={`/tracks/${t.id}`}>
-							<ItemHeader>
-								{!!t.thumbnail && <Image src={t.thumbnail} alt='thumbnail' width={500} height={500} />}
-							</ItemHeader>
-							<ItemContent>
-								<ItemTitle>{t.name}</ItemTitle>
-							</ItemContent>
-							<ItemActions>
-								<ChevronRightIcon className='size-4' />
-							</ItemActions>
-						</Link>
-					</Item>
+					<div key={t.id} className='min-w-xs sm:w-full md:w-xs'>
+						<Track data={t} />
+					</div>
 				))}
 			</div>
 		</div>

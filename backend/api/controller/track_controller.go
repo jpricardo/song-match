@@ -50,6 +50,7 @@ func (tc *TrackController) FindMatches(w http.ResponseWriter, r *http.Request) {
 			Name:         track.Name,
 			Url:          track.Url,
 			Thumbnail:    track.Thumbnail,
+			Status:       track.Status,
 			Fingerprints: fp,
 		})
 	}
@@ -86,6 +87,7 @@ func (tc *TrackController) GetMany(w http.ResponseWriter, r *http.Request) {
 			Name:         track.Name,
 			Url:          track.Url,
 			Thumbnail:    track.Thumbnail,
+			Status:       track.Status,
 			Fingerprints: fp,
 		})
 	}
@@ -116,6 +118,7 @@ func (tc *TrackController) GetById(w http.ResponseWriter, r *http.Request) {
 		Name:         track.Name,
 		Url:          track.Url,
 		Thumbnail:    track.Thumbnail,
+		Status:       track.Status,
 		Fingerprints: fp,
 	}
 
@@ -154,10 +157,11 @@ func (tc *TrackController) AddTrack(w http.ResponseWriter, r *http.Request) {
 		Name:         track.Name,
 		Url:          track.Url,
 		Thumbnail:    track.Thumbnail,
+		Status:       track.Status,
 		Fingerprints: fp,
 	}
 
-	err = jsonutil.JsonSuccessResponse(w, http.StatusOK, rd)
+	err = jsonutil.JsonSuccessResponse(w, http.StatusAccepted, rd)
 	if err != nil {
 		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return

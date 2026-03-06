@@ -15,8 +15,9 @@ type TrackDTO struct {
 	ID           primitive.ObjectID `json:"id"`
 	Name         string             `json:"name"`
 	Url          string             `json:"url"`
-	Thumbnail    string             `json:"thumbnail"`
+	Thumbnail    string             `json:"thumbnail,omitempty"`
 	Fingerprints []FingerprintDTO   `json:"fingerprints"`
+	Status       string             `json:"status"`
 }
 
 type FindTrackMatchesResponse struct {
@@ -68,6 +69,7 @@ type Track struct {
 	Thumbnail    string             `bson:"thumbnail"`
 	Fingerprints []TrackFingerprint `bson:"-"`
 	Hashes       []AudioHash        `bson:"-"`
+	Status       string             `bson:"status"`
 }
 
 type TrackRepository interface {
@@ -77,4 +79,6 @@ type TrackRepository interface {
 	GetByID(c context.Context, id string) (Track, error)
 	GetFingerprintsByID(c context.Context, id string) ([]TrackFingerprint, error)
 	GetMatchingHashes(c context.Context, hashValues []string) ([]AudioHash, error)
+	UpdateTrackData(c context.Context, track *Track) error
+	UpdateTrackStatus(c context.Context, id string, status string) error
 }

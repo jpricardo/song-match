@@ -130,36 +130,69 @@ func (tu *trackUsecase) AddTrack(c context.Context, url string) (*domain.Track, 
 	ctx, cancel := context.WithTimeout(c, tu.contextTimeout)
 	defer cancel()
 
-	wav, title, thumbnail, err := ytbutil.DownloadTrack(url)
+	t := &domain.Track{
+		Name:   "Processing...", // Temporary name
+		Url:    url,
+		Status: "processing",
+	}
+
+	err := tu.trackRepository.Create(ctx, t)
 	if err != nil {
 		return nil, err
+	}
+
+	go tu.processTrackInBackground(t.ID, url)
+
+	return t, nil
+}
+
+func (tu *trackUsecase) processTrackInBackground(trackID primitive.ObjectID, url string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	fmt.Printf("Starting background processing for track ID: %s\n", trackID.Hex())
+
+	wav, title, thumbnail, err := ytbutil.DownloadTrack(url)
+	if err != nil {
+		fmt.Printf("Background Task Failed (Download): %v\n", err)
+		tu.trackRepository.UpdateTrackStatus(ctx, trackID.Hex(), "failed")
+		return
 	}
 
 	samples, sampleRate, err := audioutil.DecodeAudio(wav)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode audio: %w", err)
+		fmt.Printf("Background Task Failed (Decode): %v\n", err)
+		tu.trackRepository.UpdateTrackStatus(ctx, trackID.Hex(), "failed")
+		return
 	}
 
 	fingerprints, err := audioutil.ExtractFingerprints(samples, sampleRate)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract fingerprints: %w", err)
+		fmt.Printf("Background Task Failed (Fingerprint): %v\n", err)
+		tu.trackRepository.UpdateTrackStatus(ctx, trackID.Hex(), "failed")
+		return
 	}
 
 	hashes := audioutil.GenerateHashes(fingerprints)
 
-	t := &domain.Track{
+	// Update the database with the real data and mark it as "ready"
+	track := &domain.Track{
+		ID:           trackID,
 		Name:         title,
-		Url:          url,
 		Thumbnail:    thumbnail,
+		Status:       "ready",
 		Fingerprints: fingerprints,
 		Hashes:       hashes,
 	}
-	err = tu.trackRepository.Create(ctx, t)
+
+	err = tu.trackRepository.UpdateTrackData(ctx, track)
 	if err != nil {
-		return nil, err
+		fmt.Printf("Background Task Failed (DB Update): %v\n", err)
+		tu.trackRepository.UpdateTrackStatus(ctx, trackID.Hex(), "failed")
+		return
 	}
 
-	return t, nil
+	fmt.Printf("Successfully processed track %s in the background!\n", title)
 }
 
 func (tu *trackUsecase) DeleteByID(c context.Context, id string) error {
