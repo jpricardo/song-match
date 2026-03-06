@@ -29,6 +29,7 @@ type Collection interface {
 	Aggregate(context.Context, interface{}) (Cursor, error)
 	UpdateOne(context.Context, interface{}, interface{}, ...*options.UpdateOptions) (*mongo.UpdateResult, error)
 	UpdateMany(context.Context, interface{}, interface{}, ...*options.UpdateOptions) (*mongo.UpdateResult, error)
+	CreateOneIndex(context.Context, mongo.IndexModel, ...*options.CreateIndexesOptions) (string, error)
 }
 
 type SingleResult interface {
@@ -207,4 +208,8 @@ func (mr *mongoCursor) Decode(v interface{}) error {
 
 func (mr *mongoCursor) All(ctx context.Context, result interface{}) error {
 	return mr.mc.All(ctx, result)
+}
+
+func (mc *mongoCollection) CreateOneIndex(ctx context.Context, model mongo.IndexModel, opts ...*options.CreateIndexesOptions) (string, error) {
+	return mc.coll.Indexes().CreateOne(ctx, model, opts...)
 }

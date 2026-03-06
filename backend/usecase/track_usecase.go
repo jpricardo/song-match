@@ -8,6 +8,8 @@ import (
 	"song-match-backend/internal/ytbutil"
 	"sort"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type trackUsecase struct {
@@ -36,53 +38,45 @@ func (tu *trackUsecase) FindMatches(c context.Context, content []byte) ([]domain
 		return nil, fmt.Errorf("failed to extract fingerprints: %w", err)
 	}
 
-	// Generate Hashes for the incoming sample
 	sampleHashes := audioutil.GenerateHashes(fingerprints)
 
-	// Map format: [HashValue] -> Array of times it occurred
+	var sampleHashValues []string
 	sampleHashMap := make(map[string][]float64)
+
 	for _, h := range sampleHashes {
+		sampleHashValues = append(sampleHashValues, h.HashValue)
 		sampleHashMap[h.HashValue] = append(sampleHashMap[h.HashValue], h.Time)
 	}
 
-	tracks, err := tu.trackRepository.Fetch(ctx)
+	matchedDBHashes, err := tu.trackRepository.GetMatchingHashes(ctx, sampleHashValues)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch tracks: %w", err)
+		return nil, fmt.Errorf("failed to fetch matching hashes: %w", err)
 	}
 
+	// Group the matched hashes by Track ID so we can build a histogram per track
+	trackHistograms := make(map[primitive.ObjectID]map[int]int)
+
+	for _, dbHash := range matchedDBHashes {
+		if _, exists := trackHistograms[dbHash.TrackID]; !exists {
+			trackHistograms[dbHash.TrackID] = make(map[int]int)
+		}
+
+		if sampleTimes, exists := sampleHashMap[dbHash.HashValue]; exists {
+			for _, sampleTime := range sampleTimes {
+				offsetBin := int((dbHash.Time - sampleTime) * 10)
+				trackHistograms[dbHash.TrackID][offsetBin]++
+			}
+		}
+	}
+
+	// Score each track based on its histogram
 	type trackScore struct {
-		track domain.Track
-		score int
+		trackID primitive.ObjectID
+		score   int
 	}
 	var scores []trackScore
 
-	// Score each track using a Time-Offset Histogram
-	for _, track := range tracks {
-		fps, err := tu.trackRepository.GetFingerprintsByID(ctx, track.ID.Hex())
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch fingerprints: %w", err)
-		}
-
-		if len(fps) == 0 {
-			continue
-		}
-
-		dbHashes := audioutil.GenerateHashes(fps)
-		offsets := make(map[int]int)
-
-		for _, dbHash := range dbHashes {
-			if sampleTimes, exists := sampleHashMap[dbHash.HashValue]; exists {
-				// Calculate how far apart they are to ensure the audio lines up
-				for _, sampleTime := range sampleTimes {
-
-					// Multiply by 10 to group offsets into 100ms bins.
-					offsetBin := int((dbHash.Time - sampleTime) * 10)
-					offsets[offsetBin]++
-				}
-			}
-		}
-
-		// The track's final score is the height of the tallest peak in the histogram
+	for trackID, offsets := range trackHistograms {
 		maxScore := 0
 		for _, count := range offsets {
 			if count > maxScore {
@@ -90,22 +84,30 @@ func (tu *trackUsecase) FindMatches(c context.Context, content []byte) ([]domain
 			}
 		}
 
-		// Filter out random noise. A real match usually has a score of 15+.
 		if maxScore > 5 {
-			scores = append(scores, trackScore{track: track, score: maxScore})
+			scores = append(scores, trackScore{trackID: trackID, score: maxScore})
 		}
 	}
 
+	// Sort highest score first
 	sort.Slice(scores, func(i, j int) bool {
 		return scores[i].score > scores[j].score
 	})
 
+	// Fetch ONLY the tracks that successfully matched
 	var matchedTracks []domain.Track
 	for _, s := range scores {
-		matchedTracks = append(matchedTracks, s.track)
+		track, err := tu.trackRepository.GetByID(ctx, s.trackID.Hex())
+		if err == nil {
+			matchedTracks = append(matchedTracks, track)
+		}
 	}
 
-	fmt.Printf("Best match: %s\n", matchedTracks[0].Name)
+	if len(matchedTracks) > 0 {
+		fmt.Printf("Best match: %s\n", matchedTracks[0].Name)
+	} else {
+		fmt.Println("Couldn't find a match!")
+	}
 
 	return matchedTracks, nil
 }
@@ -143,12 +145,14 @@ func (tu *trackUsecase) AddTrack(c context.Context, url string) (*domain.Track, 
 		return nil, fmt.Errorf("failed to extract fingerprints: %w", err)
 	}
 
+	hashes := audioutil.GenerateHashes(fingerprints)
+
 	t := &domain.Track{
 		Name:         title,
 		Url:          url,
 		Thumbnail:    thumbnail,
-		Matches:      0,
 		Fingerprints: fingerprints,
+		Hashes:       hashes,
 	}
 	err = tu.trackRepository.Create(ctx, t)
 	if err != nil {

@@ -50,7 +50,6 @@ func (tc *TrackController) FindMatches(w http.ResponseWriter, r *http.Request) {
 			Name:         track.Name,
 			Url:          track.Url,
 			Thumbnail:    track.Thumbnail,
-			Matches:      track.Matches,
 			Fingerprints: fp,
 		})
 	}
@@ -87,7 +86,6 @@ func (tc *TrackController) GetMany(w http.ResponseWriter, r *http.Request) {
 			Name:         track.Name,
 			Url:          track.Url,
 			Thumbnail:    track.Thumbnail,
-			Matches:      track.Matches,
 			Fingerprints: fp,
 		})
 	}
@@ -118,7 +116,6 @@ func (tc *TrackController) GetById(w http.ResponseWriter, r *http.Request) {
 		Name:         track.Name,
 		Url:          track.Url,
 		Thumbnail:    track.Thumbnail,
-		Matches:      track.Matches,
 		Fingerprints: fp,
 	}
 
@@ -157,7 +154,6 @@ func (tc *TrackController) AddTrack(w http.ResponseWriter, r *http.Request) {
 		Name:         track.Name,
 		Url:          track.Url,
 		Thumbnail:    track.Thumbnail,
-		Matches:      track.Matches,
 		Fingerprints: fp,
 	}
 

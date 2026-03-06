@@ -2,11 +2,13 @@ package repository
 
 import (
 	"context"
+	"log"
 	"song-match-backend/domain"
 	"song-match-backend/mongo"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	mongoDriver "go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -16,10 +18,27 @@ type trackRepository struct {
 }
 
 func NewTrackRepository(db mongo.Database, collection string) domain.TrackRepository {
-	return &trackRepository{
+	tr := &trackRepository{
 		database:   db,
 		collection: collection,
 	}
+
+	// Create the index on the Hashes collection in the background
+	hashColl := db.Collection(domain.CollectionHashes)
+
+	indexModel := mongoDriver.IndexModel{
+		Keys:    bson.D{{Key: "hash_value", Value: 1}},
+		Options: options.Index().SetBackground(true),
+	}
+
+	_, err := hashColl.CreateOneIndex(context.Background(), indexModel)
+	if err != nil {
+		log.Printf("Warning: Failed to create index on hashes collection: %v\n", err)
+	} else {
+		log.Println("Successfully verified index on hash_value.")
+	}
+
+	return tr
 }
 
 func (tr *trackRepository) Create(c context.Context, track *domain.Track) error {
@@ -46,6 +65,22 @@ func (tr *trackRepository) Create(c context.Context, track *domain.Track) error 
 		}
 
 		_, err = fpColl.InsertMany(c, docs)
+		if err != nil {
+			return err
+		}
+	}
+
+	// The same for the hashes
+	if len(track.Hashes) > 0 {
+		hashColl := tr.database.Collection(domain.CollectionHashes)
+
+		var docs []interface{}
+		for i := range track.Hashes {
+			track.Hashes[i].TrackID = track.ID
+			docs = append(docs, track.Hashes[i])
+		}
+
+		_, err = hashColl.InsertMany(c, docs)
 		if err != nil {
 			return err
 		}
@@ -130,4 +165,23 @@ func (tr *trackRepository) DeleteByID(c context.Context, id string) error {
 
 	_, err = collection.DeleteOne(c, bson.M{"_id": idHex})
 	return nil
+}
+
+func (tr *trackRepository) GetMatchingHashes(c context.Context, hashValues []string) ([]domain.AudioHash, error) {
+	collection := tr.database.Collection(domain.CollectionHashes)
+
+	filter := bson.M{"hash_value": bson.M{"$in": hashValues}}
+
+	cursor, err := collection.Find(c, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	var hashes []domain.AudioHash
+	err = cursor.All(c, &hashes)
+	if err != nil || hashes == nil {
+		return []domain.AudioHash{}, err
+	}
+
+	return hashes, nil
 }

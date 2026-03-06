@@ -163,13 +163,8 @@ func computeFFT(signal []float64) []float64 {
 	return spectrum
 }
 
-type AudioHash struct {
-	HashValue string
-	Time      float64
-}
-
-func GenerateHashes(fingerprints []domain.TrackFingerprint) []AudioHash {
-	var hashes []AudioHash
+func GenerateHashes(fingerprints []domain.TrackFingerprint) []domain.AudioHash {
+	var hashes []domain.AudioHash
 
 	// How many future fingerprints to pair with the anchor
 	targetZone := 5
@@ -196,7 +191,7 @@ func GenerateHashes(fingerprints []domain.TrackFingerprint) []AudioHash {
 					// The cryptographic hash: "f1|f2|dt"
 					hashVal := fmt.Sprintf("%d|%d|%d", f1, f2, dt)
 
-					hashes = append(hashes, AudioHash{
+					hashes = append(hashes, domain.AudioHash{
 						HashValue: hashVal,
 						Time:      anchor.Timestamp,
 					})
@@ -204,6 +199,8 @@ func GenerateHashes(fingerprints []domain.TrackFingerprint) []AudioHash {
 			}
 		}
 	}
+
+	fmt.Printf("Extracted %d hashes\n", len(hashes))
 
 	return hashes
 }
