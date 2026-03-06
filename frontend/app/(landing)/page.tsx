@@ -1,4 +1,4 @@
-import AudioRecorder from './_components/audio-recorder';
+import MatcherForm from './_components/matcher-form';
 
 export default function Home() {
 	return (
@@ -11,8 +11,8 @@ export default function Home() {
 					</p>
 				</div>
 
-				<section className='w-full bg-accent rounded-xl p-6 flex justify-center align-center'>
-					<AudioRecorder />
+				<section className='w-full flex justify-center align-center'>
+					<MatcherForm />
 				</section>
 			</main>
 		</div>

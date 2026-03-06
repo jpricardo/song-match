@@ -1,6 +1,5 @@
+import Track, { TrackSkeleton } from '@/app/_components/track';
 import { trackService } from '@/services/track';
-
-import Track, { TrackSkeleton } from './track';
 
 export function TrackListSkeleton() {
 	const amt = 24;
