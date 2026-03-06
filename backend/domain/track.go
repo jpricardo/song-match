@@ -68,4 +68,5 @@ type TrackRepository interface {
 	Fetch(c context.Context) ([]Track, error)
 	DeleteByID(c context.Context, id string) error
 	GetByID(c context.Context, id string) (Track, error)
+	GetFingerprintsByID(c context.Context, id string) ([]TrackFingerprint, error)
 }

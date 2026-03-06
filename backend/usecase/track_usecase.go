@@ -6,6 +6,7 @@ import (
 	"song-match-backend/domain"
 	"song-match-backend/internal/audioutil"
 	"song-match-backend/internal/ytbutil"
+	"sort"
 	"time"
 )
 
@@ -22,7 +23,7 @@ func NewTrackUsecase(trackRepository domain.TrackRepository, timeout time.Durati
 }
 
 func (tu *trackUsecase) FindMatches(c context.Context, content []byte) ([]domain.Track, error) {
-	_, cancel := context.WithTimeout(c, tu.contextTimeout)
+	ctx, cancel := context.WithTimeout(c, tu.contextTimeout)
 	defer cancel()
 
 	samples, sampleRate, err := audioutil.DecodeAudio(content)
@@ -35,11 +36,78 @@ func (tu *trackUsecase) FindMatches(c context.Context, content []byte) ([]domain
 		return nil, fmt.Errorf("failed to extract fingerprints: %w", err)
 	}
 
-	fmt.Printf("Extracted %d fingerprints at %d Hz\n", len(fingerprints), sampleRate)
+	// Generate Hashes for the incoming sample
+	sampleHashes := audioutil.GenerateHashes(fingerprints)
 
-	// TODO - Track processing / lookup
-	m := []domain.Track{}
-	return m, nil
+	// Map format: [HashValue] -> Array of times it occurred
+	sampleHashMap := make(map[string][]float64)
+	for _, h := range sampleHashes {
+		sampleHashMap[h.HashValue] = append(sampleHashMap[h.HashValue], h.Time)
+	}
+
+	tracks, err := tu.trackRepository.Fetch(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch tracks: %w", err)
+	}
+
+	type trackScore struct {
+		track domain.Track
+		score int
+	}
+	var scores []trackScore
+
+	// Score each track using a Time-Offset Histogram
+	for _, track := range tracks {
+		fps, err := tu.trackRepository.GetFingerprintsByID(ctx, track.ID.Hex())
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch fingerprints: %w", err)
+		}
+
+		if len(fps) == 0 {
+			continue
+		}
+
+		dbHashes := audioutil.GenerateHashes(fps)
+		offsets := make(map[int]int)
+
+		for _, dbHash := range dbHashes {
+			if sampleTimes, exists := sampleHashMap[dbHash.HashValue]; exists {
+				// Calculate how far apart they are to ensure the audio lines up
+				for _, sampleTime := range sampleTimes {
+
+					// Multiply by 10 to group offsets into 100ms bins.
+					offsetBin := int((dbHash.Time - sampleTime) * 10)
+					offsets[offsetBin]++
+				}
+			}
+		}
+
+		// The track's final score is the height of the tallest peak in the histogram
+		maxScore := 0
+		for _, count := range offsets {
+			if count > maxScore {
+				maxScore = count
+			}
+		}
+
+		// Filter out random noise. A real match usually has a score of 15+.
+		if maxScore > 5 {
+			scores = append(scores, trackScore{track: track, score: maxScore})
+		}
+	}
+
+	sort.Slice(scores, func(i, j int) bool {
+		return scores[i].score > scores[j].score
+	})
+
+	var matchedTracks []domain.Track
+	for _, s := range scores {
+		matchedTracks = append(matchedTracks, s.track)
+	}
+
+	fmt.Printf("Best match: %s\n", matchedTracks[0].Name)
+
+	return matchedTracks, nil
 }
 
 func (tu *trackUsecase) GetMany(c context.Context) ([]domain.Track, error) {
@@ -74,8 +142,6 @@ func (tu *trackUsecase) AddTrack(c context.Context, url string) (*domain.Track, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract fingerprints: %w", err)
 	}
-
-	fmt.Printf("Extracted %d fingerprints at %d Hz\n", len(fingerprints), sampleRate)
 
 	t := &domain.Track{
 		Name:         title,

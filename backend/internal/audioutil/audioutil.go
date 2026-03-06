@@ -110,6 +110,8 @@ func ExtractFingerprints(samples []float64, sampleRate int) ([]domain.TrackFinge
 		fingerprints = append(fingerprints, fingerprint)
 	}
 
+	fmt.Printf("Extracted %d fingerprints at %d Hz\n", len(fingerprints), sampleRate)
+
 	return fingerprints, nil
 }
 
@@ -159,4 +161,49 @@ func computeFFT(signal []float64) []float64 {
 	}
 
 	return spectrum
+}
+
+type AudioHash struct {
+	HashValue string
+	Time      float64
+}
+
+func GenerateHashes(fingerprints []domain.TrackFingerprint) []AudioHash {
+	var hashes []AudioHash
+
+	// How many future fingerprints to pair with the anchor
+	targetZone := 5
+
+	for i := range fingerprints {
+		anchor := fingerprints[i]
+
+		end := i + targetZone
+		if end > len(fingerprints) {
+			end = len(fingerprints)
+		}
+
+		// Create pairs between the anchor and the targets
+		for j := i + 1; j < end; j++ {
+			target := fingerprints[j]
+
+			// Time difference in milliseconds (the 3rd part of our hash)
+			dt := int((target.Timestamp - anchor.Timestamp) * 1000)
+
+			// Cross-match every peak in the anchor with every peak in the target
+			for _, f1 := range anchor.Peaks {
+				for _, f2 := range target.Peaks {
+
+					// The cryptographic hash: "f1|f2|dt"
+					hashVal := fmt.Sprintf("%d|%d|%d", f1, f2, dt)
+
+					hashes = append(hashes, AudioHash{
+						HashValue: hashVal,
+						Time:      anchor.Timestamp,
+					})
+				}
+			}
+		}
+	}
+
+	return hashes
 }

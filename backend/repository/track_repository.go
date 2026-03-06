@@ -88,16 +88,36 @@ func (tr *trackRepository) GetByID(c context.Context, id string) (domain.Track, 
 	}
 
 	// Fetch its Fingerprints
-	fpColl := tr.database.Collection(domain.CollectionFingerprint)
-	cursor, err := fpColl.Find(c, bson.M{"track_id": idHex})
-	if err == nil {
-		var fps []domain.TrackFingerprint
-		if err = cursor.All(c, &fps); err == nil {
-			track.Fingerprints = fps
-		}
+	fps, err := tr.GetFingerprintsByID(c, id)
+	if err != nil {
+		return track, err
 	}
 
+	track.Fingerprints = fps
+
 	return track, nil
+}
+
+func (tr *trackRepository) GetFingerprintsByID(c context.Context, id string) ([]domain.TrackFingerprint, error) {
+	collection := tr.database.Collection(domain.CollectionFingerprint)
+
+	idHex, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, err
+	}
+
+	cursor, err := collection.Find(c, bson.M{"track_id": idHex})
+	if err != nil {
+		return nil, err
+	}
+
+	var fingerprints []domain.TrackFingerprint
+	err = cursor.All(c, &fingerprints)
+	if err != nil || fingerprints == nil {
+		return []domain.TrackFingerprint{}, err
+	}
+
+	return fingerprints, nil
 }
 
 func (tr *trackRepository) DeleteByID(c context.Context, id string) error {
