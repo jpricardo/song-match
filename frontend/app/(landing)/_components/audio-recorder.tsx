@@ -57,7 +57,7 @@ export default function AudioRecorder({ state, url, onStart, onStop, onSubmit }:
 					)}
 
 					{url && (
-						<Button onClick={handleSubmit}>
+						<Button onClick={handleSubmit} disabled={loading}>
 							{loading ? <Spinner /> : <Check />}
 							Submit
 						</Button>
