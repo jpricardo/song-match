@@ -1,35 +1,19 @@
 'use client';
-import { Check, CircleStop, Info, Mic } from 'lucide-react';
-import { useState } from 'react';
+import { Info } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
+
+import { Timer } from './timer';
 
 type Props = {
+	currentTime: number;
 	state: RecordingState;
-	url: string | undefined;
+	error: Error | undefined;
+	loading: boolean;
 	onStart: VoidFunction;
 	onStop: VoidFunction;
-	onSubmit: () => Promise<void>;
 };
-export default function AudioRecorder({ state, url, onStart, onStop, onSubmit }: Props) {
-	const [error, setError] = useState<Error>();
-	const [loading, setLoading] = useState(false);
-
-	const handleSubmit = async () => {
-		setLoading(true);
-		setError(undefined);
-
-		try {
-			await onSubmit();
-		} catch (err) {
-			setError(err as Error);
-		} finally {
-			setLoading(false);
-		}
-	};
-
+export default function AudioRecorder({ currentTime, state, error, loading, onStart, onStop }: Props) {
 	return (
 		<div className='flex flex-col gap-2 justify-center items-center w-full max-w-xs'>
 			{error && (
@@ -40,30 +24,15 @@ export default function AudioRecorder({ state, url, onStart, onStop, onSubmit }:
 				</Alert>
 			)}
 
-			<div className='flex flex-col gap-4 w-full'>
-				{state === 'recording' && <span>Recording...</span>}
-
-				<div className='flex gap-2 w-full flex-col'>
-					{state === 'recording' ? (
-						<Button onClick={onStop}>
-							<CircleStop />
-							Stop
-						</Button>
-					) : (
-						<Button onClick={onStart}>
-							<Mic />
-							Start Recording
-						</Button>
-					)}
-
-					{url && (
-						<Button onClick={handleSubmit} disabled={loading}>
-							{loading ? <Spinner /> : <Check />}
-							Submit
-						</Button>
-					)}
-				</div>
-			</div>
+			<Timer
+				currentTime={currentTime}
+				recording={state === 'recording'}
+				loading={loading}
+				onClick={() => {
+					if (state === 'recording') return onStop();
+					onStart();
+				}}
+			/>
 		</div>
 	);
 }

@@ -1,75 +1,59 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { encodeWAV } from '@/lib/audio';
 
-type MediaRecorderOptions = {
-	onStart: VoidFunction;
-	onStop: VoidFunction;
-	onDataAvailable: (ev: BlobEvent) => void;
-};
-function createRecorder(stream: MediaStream, options: MediaRecorderOptions): MediaRecorder {
-	const mr = new MediaRecorder(stream);
+async function getBlob(dataBlob: Blob) {
+	// Decode WebM to raw PCM samples
+	const arrayBuffer = await dataBlob.arrayBuffer();
+	const audioContext = new AudioContext();
 
-	mr.ondataavailable = options.onDataAvailable;
-	mr.onstart = options.onStart;
-	mr.onstop = options.onStop;
+	try {
+		const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+		console.log('Decoded audio:', audioBuffer.sampleRate, audioBuffer.length);
 
-	return mr;
+		// Manually construct WAV file from PCM
+		const wav = encodeWAV(audioBuffer);
+		console.log('WAV buffer size:', wav.byteLength);
+		return new Blob([wav], { type: 'audio/wav' });
+	} catch (err) {
+		console.error('Failed to decode audio:', err);
+		throw err;
+	}
 }
 
-export function useRecorder() {
+type RecorderOptions = { onStart?: VoidFunction; onStop?: VoidFunction; onData?: (data: Blob) => void };
+export function useRecorder(options?: RecorderOptions) {
 	const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder>();
-	const [chunks, setChunks] = useState<Blob[]>([]);
+
+	const state = mediaRecorder?.state;
 
 	const start = () => mediaRecorder?.start();
 	const stop = () => mediaRecorder?.stop();
 
-	const setup = async () => {
-		const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-		const mr = createRecorder(stream, {
-			onDataAvailable: (event) => event.data.size > 0 && setChunks((prev) => [...prev, event.data]),
-			onStart: () => setChunks([]),
-			onStop: () => console.log('Stop!'),
+	const setup = useCallback(async () => {
+		const stream = await window.navigator.mediaDevices.getUserMedia({ audio: { noiseSuppression: { ideal: false } } });
+		const mr = new MediaRecorder(stream);
+
+		mr.addEventListener('start', () => {
+			console.log('Starting recorder...');
+			options?.onStart?.();
+		});
+		mr.addEventListener('stop', () => {
+			console.log('Stopping recorder...');
+			options?.onStop?.();
+		});
+		mr.addEventListener('dataavailable', (ev) => {
+			if (ev.data.size <= 0) return;
+			return getBlob(new Blob([ev.data], { type: 'audio/webm' })).then((b) => options?.onData?.(b));
 		});
 
-		setMediaRecorder(mr);
-	};
+		return mr;
+	}, [options]);
 
-	const ready = !!mediaRecorder;
-	const state = mediaRecorder?.state;
+	useEffect(() => {
+		if (!mediaRecorder) setup().then((mr) => setMediaRecorder(mr));
+	}, [mediaRecorder, setup]);
 
-	const data = chunks.length ? new Blob(chunks, { type: 'audio/webm' }) : undefined;
-	const url = data ? URL.createObjectURL(data) : undefined;
-
-	const getData = async () => {
-		if (!data) throw new Error('No data!');
-
-		// Decode WebM to raw PCM samples
-		const arrayBuffer = await data.arrayBuffer();
-		const audioContext = new AudioContext();
-
-		try {
-			const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-			console.log('Decoded audio:', audioBuffer.sampleRate, audioBuffer.length);
-
-			// Manually construct WAV file from PCM
-			const wav = encodeWAV(audioBuffer);
-			console.log('WAV buffer size:', wav.byteLength);
-			return new Blob([wav], { type: 'audio/wav' });
-		} catch (err) {
-			console.error('Failed to decode audio:', err);
-			throw err;
-		}
-	};
-
-	return {
-		ready,
-		state,
-		url,
-		getData,
-		start,
-		stop,
-		setup,
-	};
+	return { state, start, stop };
 }
