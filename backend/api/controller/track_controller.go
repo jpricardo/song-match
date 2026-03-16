@@ -12,16 +12,22 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// maxAudioBodyBytes caps incoming WAV bodies at 50 MB.
+// A 3-minute stereo 44100 Hz 16-bit WAV is ~30 MB, so this is generous
+// while still protecting against unbounded memory allocation.
+const maxAudioBodyBytes = 50 * 1024 * 1024
+
 type TrackController struct {
 	TrackUsecase domain.TrackUseCase
 	Env          *bootstrap.Env
 }
 
 func (tc *TrackController) FindMatches(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxAudioBodyBytes)
 
 	content, err := io.ReadAll(r.Body)
 	if err != nil {
-		jsonutil.JsonErrorResponse(w, http.StatusBadRequest, err.Error())
+		jsonutil.JsonErrorResponse(w, http.StatusRequestEntityTooLarge, "audio payload too large or unreadable")
 		return
 	}
 	defer r.Body.Close()
