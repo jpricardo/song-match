@@ -27,6 +27,9 @@ services:
     deploy:
       mode: replicated
       replicas: 1
+    depends_on:
+      mongo:
+        condition: service_healthy
     environment:
       SERVER_ADDRESS: :80
       CONTEXT_TIMEOUT: 120
@@ -40,19 +43,49 @@ services:
       ACCESS_TOKEN_SECRET: supersecrettoken
       REFRESH_TOKEN_SECRET: ultrasupersecrettoken
 
+  # One-shot container that generates the keyfile into the shared volume
+  # before mongod starts. Exits immediately after writing the file.
+  mongo-keyfile-init:
+    image: 'mongo:7.0'
+    entrypoint: >
+      bash -c "
+        if [ ! -f /etc/mongo-keyfile ]; then
+          openssl rand -base64 756 > /etc/mongo-keyfile &&
+          chmod 400 /etc/mongo-keyfile &&
+          chown 999:999 /etc/mongo-keyfile &&
+          echo 'Keyfile generated.';
+        else
+          echo 'Keyfile already exists.';
+        fi
+      "
+    volumes:
+      - mongo-keyfile:/etc/
+
   mongo:
-    image: 'mongo:4.2.16-bionic'
+    image: 'mongo:7.0'
     ports:
       - '27017:27017'
+    command: ['--replSet', 'rs0', '--bind_ip_all', '--keyFile', '/etc/mongo-keyfile']
     deploy:
       mode: replicated
       replicas: 1
+    depends_on:
+      mongo-keyfile-init:
+        condition: service_completed_successfully
     environment:
       MONGO_INITDB_DATABASE: song-match
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: password
     volumes:
       - ./db-data/mongo/:/data/db
+      - mongo-keyfile:/etc/
+      - ./rs-init.sh:/rs-init.sh
+    healthcheck:
+      test: ['CMD', 'bash', '/rs-init.sh']
+      interval: 5s
+      timeout: 30s
+      retries: 10
+      start_period: 15s
 
   rabbitmq:
     image: 'rabbitmq:3.9-alpine'
@@ -63,3 +96,6 @@ services:
       replicas: 1
     volumes:
       - ./db-data/rabbitmq/:/var/lib/rabbitmq/
+
+volumes:
+  mongo-keyfile:

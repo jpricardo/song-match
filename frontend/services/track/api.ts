@@ -36,7 +36,7 @@ export class TrackApi implements ITrackApi {
 	public async postFindMatches(
 		payload: Uint8Array<ArrayBuffer>
 	): ApiResponse<z.input<typeof PostFindMatchesResponseSchema>> {
-		return await this.httpAdapter.post(`${this.baseUrl}/tracks/find`, {
+		return await this.httpAdapter.post(`${this.baseUrl}/matches`, {
 			body: payload,
 			headers: { 'Content-Type': 'application/octet-stream' },
 		});

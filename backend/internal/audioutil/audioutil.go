@@ -3,6 +3,7 @@ package audioutil
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"math"
 	"song-match-backend/domain"
 	"sort"
@@ -32,7 +33,6 @@ var frequencyBands = [5][2]float64{
 	{4000, 16000}, // Treble (Air, Hi-hats)
 }
 
-// Update FindPeaks to accept sampleRate to calculate Hz correctly
 func FindPeaks(spectrum []float64, sampleRate int) []int {
 	peaks := []int{}
 
@@ -85,12 +85,41 @@ func FindPeaks(spectrum []float64, sampleRate int) []int {
 		}
 	}
 
+	sort.Ints(peaks)
+
 	return peaks
+}
+
+// fftPlan is a reusable plan for windows of a fixed size.
+type fftPlan struct {
+	size int
+}
+
+func newFFTPlan(size int) *fftPlan {
+	return &fftPlan{size: size}
+}
+
+func (p *fftPlan) compute(window []float64) []float64 {
+	fftSize := p.size
+	padded := make([]complex128, fftSize)
+	for i, s := range window {
+		padded[i] = complex(s, 0)
+	}
+
+	result := fft.FFT(padded)
+
+	spectrum := make([]float64, len(result)/2)
+	for i := range spectrum {
+		spectrum[i] = math.Abs(real(result[i]))
+	}
+
+	return spectrum
 }
 
 func ExtractFingerprints(samples []float64, sampleRate int) ([]domain.TrackFingerprint, error) {
 	windowSize := 8192
 	hopSize := 4096
+	plan := newFFTPlan(windowSize)
 
 	var fingerprints []domain.TrackFingerprint
 
@@ -100,7 +129,7 @@ func ExtractFingerprints(samples []float64, sampleRate int) ([]domain.TrackFinge
 		copy(window, samples[i:i+windowSize])
 
 		HannWindow(window)
-		spectrum := computeFFT(window)
+		spectrum := plan.compute(window)
 
 		fingerprint := domain.TrackFingerprint{
 			Timestamp: float64(i) / float64(sampleRate),
@@ -110,7 +139,10 @@ func ExtractFingerprints(samples []float64, sampleRate int) ([]domain.TrackFinge
 		fingerprints = append(fingerprints, fingerprint)
 	}
 
-	fmt.Printf("Extracted %d fingerprints at %d Hz\n", len(fingerprints), sampleRate)
+	slog.Info("fingerprint extraction complete",
+		"count", len(fingerprints),
+		"sample_rate", sampleRate,
+	)
 
 	return fingerprints, nil
 }
@@ -132,14 +164,35 @@ func DecodeAudio(data []byte) ([]float64, int, error) {
 		return nil, 0, err
 	}
 
+	format := decoder.Format()
+	sampleRate := int(format.SampleRate)
+	numChannels := int(format.NumChannels)
 	n := len(buf.Data)
 
-	samples := make([]float64, n)
-	for i := 0; i < n; i++ {
-		samples[i] = float64(buf.Data[i]) / 32768.0
+	// Downmix multi-channel audio to mono by averaging channel samples
+	// Without this, stereo interleaving corrupts every FFT window
+	if numChannels < 1 {
+		return nil, 0, fmt.Errorf("invalid WAV file: no audio channels")
 	}
 
-	return samples, int(decoder.Format().SampleRate), nil
+	numFrames := n / numChannels
+	samples := make([]float64, numFrames)
+
+	for frame := range numFrames {
+		var sum float64
+		for ch := range numChannels {
+			sum += float64(buf.Data[frame*numChannels+ch])
+		}
+		samples[frame] = (sum / float64(numChannels)) / 32768.0
+	}
+
+	slog.Info("audio decoded",
+		"frames", numFrames,
+		"channels", numChannels,
+		"sample_rate", sampleRate,
+	)
+
+	return samples, sampleRate, nil
 }
 
 func computeFFT(signal []float64) []float64 {
@@ -200,7 +253,7 @@ func GenerateHashes(fingerprints []domain.TrackFingerprint) []domain.AudioHash {
 		}
 	}
 
-	fmt.Printf("Extracted %d hashes\n", len(hashes))
+	slog.Info("hash generation complete", "count", len(hashes))
 
 	return hashes
 }

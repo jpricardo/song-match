@@ -1,9 +1,8 @@
 package controller
 
 import (
-	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"song-match-backend/bootstrap"
 	"song-match-backend/domain"
@@ -32,7 +31,7 @@ func (tc *TrackController) FindMatches(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	fmt.Printf("Received %d bytes\n", len(content))
+	slog.Info("match request received", "bytes", len(content))
 
 	matches, err := tc.TrackUsecase.FindMatches(r.Context(), content)
 	if err != nil {
@@ -66,7 +65,7 @@ func (tc *TrackController) GetMany(w http.ResponseWriter, r *http.Request) {
 
 	tracks, err := tc.TrackUsecase.GetMany(r.Context())
 	if err != nil {
-		log.Println(err)
+		slog.Error("GetMany failed", "error", err)
 		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, "Unexpected error")
 		return
 	}
@@ -104,6 +103,7 @@ func (tc *TrackController) GetById(w http.ResponseWriter, r *http.Request) {
 
 	track, err := tc.TrackUsecase.GetByID(r.Context(), trackId)
 	if err != nil {
+		slog.Error("GetByID failed", "track_id", trackId, "error", err)
 		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, "Unexpected error")
 		return
 	}
@@ -134,14 +134,14 @@ func (tc *TrackController) AddTrack(w http.ResponseWriter, r *http.Request) {
 
 	err := jsonutil.ReadJSON(w, r, &payload)
 	if err != nil {
-		log.Println(err)
+		slog.Error("AddTrack: failed to parse payload", "error", err)
 		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	track, err := tc.TrackUsecase.AddTrack(r.Context(), payload.Url)
 	if err != nil {
-		log.Println(err)
+		slog.Error("AddTrack failed", "url", payload.Url, "error", err)
 		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -173,7 +173,7 @@ func (tc *TrackController) DeleteById(w http.ResponseWriter, r *http.Request) {
 
 	err := tc.TrackUsecase.DeleteByID(r.Context(), trackId)
 	if err != nil {
-		log.Println(err)
+		slog.Error("DeleteByID failed", "track_id", trackId, "error", err)
 		jsonutil.JsonErrorResponse(w, http.StatusInternalServerError, "Unexpected error")
 		return
 	}

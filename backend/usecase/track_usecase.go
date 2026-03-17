@@ -3,28 +3,44 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"song-match-backend/domain"
 	"song-match-backend/internal/audioutil"
 	"song-match-backend/internal/ytbutil"
 	"sort"
+	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type trackUsecase struct {
+type TrackUsecase struct {
 	trackRepository domain.TrackRepository
 	contextTimeout  time.Duration
+
+	// shutdown can wait for in-flight processing to complete before exiting.
+	wg sync.WaitGroup
+	// shutdown is closed by Shutdown() to signal goroutines to stop early.
+	shutdown chan struct{}
 }
 
-func NewTrackUsecase(trackRepository domain.TrackRepository, timeout time.Duration) domain.TrackUseCase {
-	return &trackUsecase{
+func NewTrackUsecase(trackRepository domain.TrackRepository, timeout time.Duration) *TrackUsecase {
+	return &TrackUsecase{
 		trackRepository: trackRepository,
 		contextTimeout:  timeout,
+		shutdown:        make(chan struct{}),
 	}
 }
 
-func (tu *trackUsecase) FindMatches(c context.Context, content []byte) ([]domain.Track, error) {
+// Shutdown waits for all background processing goroutines to finish.
+// Call this during graceful server shutdown so no track is left permanently
+// stuck in "processing" status.
+func (tu *TrackUsecase) Shutdown() {
+	close(tu.shutdown)
+	tu.wg.Wait()
+}
+
+func (tu *TrackUsecase) FindMatches(c context.Context, content []byte) ([]domain.Track, error) {
 	ctx, cancel := context.WithTimeout(c, tu.contextTimeout)
 	defer cancel()
 
@@ -94,41 +110,66 @@ func (tu *trackUsecase) FindMatches(c context.Context, content []byte) ([]domain
 		return scores[i].score > scores[j].score
 	})
 
-	// Fetch ONLY the tracks that successfully matched
-	var matchedTracks []domain.Track
+	// Collect all matched IDs and fetch in a single query.
+	matchedIDs := make([]string, 0, len(scores))
+	scoreByID := make(map[string]int, len(scores))
 	for _, s := range scores {
-		track, err := tu.trackRepository.GetByID(ctx, s.trackID.Hex())
-		if err == nil {
-			matchedTracks = append(matchedTracks, track)
-		}
+		hex := s.trackID.Hex()
+		matchedIDs = append(matchedIDs, hex)
+		scoreByID[hex] = s.score
 	}
 
+	matchedTracks, err := tu.trackRepository.GetManyByIDs(ctx, matchedIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch matched tracks: %w", err)
+	}
+
+	// Re-sort fetched tracks to match score order, since $in does not
+	// guarantee ordering.
+	sort.Slice(matchedTracks, func(i, j int) bool {
+		return scoreByID[matchedTracks[i].ID.Hex()] > scoreByID[matchedTracks[j].ID.Hex()]
+	})
+
 	if len(matchedTracks) > 0 {
-		fmt.Printf("Best match: %s\n", matchedTracks[0].Name)
+		slog.Info("match found",
+			"best_match", matchedTracks[0].Name,
+			"score", scoreByID[matchedTracks[0].ID.Hex()],
+			"total_candidates", len(matchedTracks),
+		)
 	} else {
-		fmt.Println("Couldn't find a match!")
+		slog.Info("no match found")
 	}
 
 	return matchedTracks, nil
 }
 
-func (tu *trackUsecase) GetMany(c context.Context) ([]domain.Track, error) {
+func (tu *TrackUsecase) GetMany(c context.Context) ([]domain.Track, error) {
 	ctx, cancel := context.WithTimeout(c, tu.contextTimeout)
 	defer cancel()
 
 	return tu.trackRepository.Fetch(ctx)
 }
 
-func (tu *trackUsecase) GetByID(c context.Context, id string) (domain.Track, error) {
+func (tu *TrackUsecase) GetByID(c context.Context, id string) (domain.Track, error) {
 	ctx, cancel := context.WithTimeout(c, tu.contextTimeout)
 	defer cancel()
 
 	return tu.trackRepository.GetByID(ctx, id)
 }
 
-func (tu *trackUsecase) AddTrack(c context.Context, url string) (*domain.Track, error) {
-	ctx, cancel := context.WithTimeout(c, tu.contextTimeout)
-	defer cancel()
+func (tu *TrackUsecase) AddTrack(c context.Context, url string) (*domain.Track, error) {
+	// Use a separate background context for the DB insert so
+	// the write is not canceled when AddTrack returns and the request context
+	// is torn down. The caller's context is only used to respect any upstream
+	// cancellation that arrives before we even start.
+	select {
+	case <-c.Done():
+		return nil, c.Err()
+	default:
+	}
+
+	insertCtx, insertCancel := context.WithTimeout(context.Background(), tu.contextTimeout)
+	defer insertCancel()
 
 	t := &domain.Track{
 		Name:   "Processing...", // Temporary name
@@ -136,39 +177,54 @@ func (tu *trackUsecase) AddTrack(c context.Context, url string) (*domain.Track, 
 		Status: "processing",
 	}
 
-	err := tu.trackRepository.Create(ctx, t)
+	err := tu.trackRepository.Create(insertCtx, t)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create track record: %w", err)
 	}
 
-	go tu.processTrackInBackground(t.ID, url)
+	tu.wg.Go(func() {
+		tu.processTrackInBackground(t.ID, url)
+	})
 
 	return t, nil
 }
 
-func (tu *trackUsecase) processTrackInBackground(trackID primitive.ObjectID, url string) {
+func (tu *TrackUsecase) processTrackInBackground(trackID primitive.ObjectID, url string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	fmt.Printf("Starting background processing for track ID: %s\n", trackID.Hex())
+	log := slog.With("track_id", trackID.Hex(), "url", url)
+	log.Info("background processing started")
+
+	// Respect shutdown signal — abort early and leave the
+	// track in "processing" rather than completing a half-written state. The
+	// server restart will need to clean up stale "processing" records, but at
+	// least no corrupt data is written.
+	select {
+	case <-tu.shutdown:
+		log.Warn("background processing aborted: server shutting down")
+		tu.trackRepository.UpdateTrackStatus(ctx, trackID.Hex(), "failed")
+		return
+	default:
+	}
 
 	wav, title, thumbnail, err := ytbutil.DownloadTrack(url)
 	if err != nil {
-		fmt.Printf("Background Task Failed (Download): %v\n", err)
+		log.Error("background processing failed at download", "error", err)
 		tu.trackRepository.UpdateTrackStatus(ctx, trackID.Hex(), "failed")
 		return
 	}
 
 	samples, sampleRate, err := audioutil.DecodeAudio(wav)
 	if err != nil {
-		fmt.Printf("Background Task Failed (Decode): %v\n", err)
+		log.Error("background processing failed at decode", "error", err)
 		tu.trackRepository.UpdateTrackStatus(ctx, trackID.Hex(), "failed")
 		return
 	}
 
 	fingerprints, err := audioutil.ExtractFingerprints(samples, sampleRate)
 	if err != nil {
-		fmt.Printf("Background Task Failed (Fingerprint): %v\n", err)
+		log.Error("background processing failed at fingerprinting", "error", err)
 		tu.trackRepository.UpdateTrackStatus(ctx, trackID.Hex(), "failed")
 		return
 	}
@@ -187,15 +243,15 @@ func (tu *trackUsecase) processTrackInBackground(trackID primitive.ObjectID, url
 
 	err = tu.trackRepository.UpdateTrackData(ctx, track)
 	if err != nil {
-		fmt.Printf("Background Task Failed (DB Update): %v\n", err)
+		log.Error("background processing failed at DB update", "error", err)
 		tu.trackRepository.UpdateTrackStatus(ctx, trackID.Hex(), "failed")
 		return
 	}
 
-	fmt.Printf("Successfully processed track %s in the background!\n", title)
+	log.Info("background processing complete", "title", title)
 }
 
-func (tu *trackUsecase) DeleteByID(c context.Context, id string) error {
+func (tu *TrackUsecase) DeleteByID(c context.Context, id string) error {
 	ctx, cancel := context.WithTimeout(c, tu.contextTimeout)
 	defer cancel()
 

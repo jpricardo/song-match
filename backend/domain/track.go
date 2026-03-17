@@ -40,6 +40,7 @@ type TrackUseCase interface {
 	GetByID(c context.Context, id string) (Track, error)
 	DeleteByID(c context.Context, id string) error
 	AddTrack(c context.Context, url string) (*Track, error)
+	Shutdown()
 }
 
 const (
@@ -81,4 +82,5 @@ type TrackRepository interface {
 	GetMatchingHashes(c context.Context, hashValues []string) ([]AudioHash, error)
 	UpdateTrackData(c context.Context, track *Track) error
 	UpdateTrackStatus(c context.Context, id string, status string) error
+	GetManyByIDs(c context.Context, ids []string) ([]Track, error)
 }

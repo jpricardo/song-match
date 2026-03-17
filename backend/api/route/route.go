@@ -2,6 +2,7 @@ package route
 
 import (
 	"net/http"
+	"song-match-backend/api/controller"
 	"song-match-backend/bootstrap"
 	"song-match-backend/mongo"
 	"time"
@@ -11,7 +12,7 @@ import (
 	"github.com/go-chi/cors"
 )
 
-func Setup(env *bootstrap.Env, timeout time.Duration, db mongo.Database) http.Handler {
+func Setup(env *bootstrap.Env, timeout time.Duration, db mongo.Database) (http.Handler, *controller.TrackController) {
 	mux := chi.NewRouter()
 
 	mux.Use(cors.Handler(cors.Options{
@@ -23,9 +24,11 @@ func Setup(env *bootstrap.Env, timeout time.Duration, db mongo.Database) http.Ha
 		MaxAge:           300,
 	}))
 
-	mux.Use(middleware.Heartbeat("/ping"), middleware.DefaultLogger)
+	mux.Use(middleware.RequestID)
+	mux.Use(slogRequestLogger())
+	mux.Use(middleware.Heartbeat("/ping"))
 
-	NewTrackRouter(env, timeout, db, mux)
+	tc := NewTrackRouter(env, timeout, db, mux)
 
-	return mux
+	return mux, tc
 }
